@@ -1,0 +1,2431 @@
+---
+title: "1.glmm_morphogroups_chrono"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Packages
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(lubridate)
+library(DHARMa)
+library(glmmTMB)
+library(car)
+library(lattice)
+library(broom.mixed)  
+select <- dplyr::select
+```
+
+# 2. Open datasets
+
+```{r}
+coleo_tot <- read.csv("2.temporal_morphogroups/input/coleo_year.csv") %>% 
+  mutate(id_parcelle=as.character(id_parcelle))
+
+plots_plus_sept <- coleo_tot %>% 
+  select(id_parcelle,annee) %>% 
+  distinct() %>% 
+  group_by(id_parcelle) %>% 
+  mutate(nbre_annee= n_distinct(annee)) %>% 
+  select(id_parcelle,nbre_annee) %>% 
+  distinct() %>% 
+  filter(nbre_annee > 7)
+
+coleo_year <- coleo_tot %>% 
+  filter(id_parcelle %in% plots_plus_sept$id_parcelle) 
+summary(coleo_year)
+write.csv(coleo_year,"2.temporal_morphogroups/output/coleo_year.csv")
+
+
+crop <- read_delim("2.temporal_morphogroups/input/region_and_crop_type.csv") %>%
+  mutate(crop=TypeCulture,
+         crop=as.factor(crop),
+         id_parcelle=as.character(id_parcelle))
+
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)
+  rp <- residuals(model, type = "pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq / rdf
+  pval <- pchisq(Pearson.chisq, df = rdf, lower.tail = FALSE)
+  c(chisq = Pearson.chisq, ratio = prat, rdf = rdf, p = pval)
+}
+
+```
+
+# 3. Ab morphogroups
+
+## 3.1. Bruches
+
+```{r}
+mod <- glmmTMB(Bruches ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+effet pos annee 0.03 \*\*\*
+
+Pour avoir IRR, facteurs multiplicatifs :
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Bruches <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Bruches
+```
+
+annee : IRR = 1.03 → +1 année → espérance de Bruches × 1.03 (+3%)
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Bruches), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Bruches)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Seed beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.2. Buprestes
+
+```{r}
+mod <- glmmTMB(Buprestes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.02 \*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Buprestes <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Buprestes
+```
+
+IRR 0.97, -3%
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Buprestes), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Buprestes)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "firebrick4",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "firebrick4",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Jewel beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.3. Cantharides
+
+```{r}
+mod <- glmmTMB(Cantharides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Cantharides), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Cantharides)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Soldier beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.4. Carabiques
+
+```{r}
+mod <- glmmTMB(Carabiques ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+
+summary(mod)
+Anova(mod)
+```
+
+-0.03 \*\*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Carabiques <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Carabiques
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Carabiques), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Carabiques)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "firebrick4",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "firebrick4",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Ground beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.5. Charançons
+
+```{r}
+mod <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+
+-0.01 \*\*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Charançons <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Charançons
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Charançons), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Charançons)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "firebrick4",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "firebrick4",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Weevil abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.6. Chrysomèles
+
+```{r}
+mod <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # trop de zéros
+
+mod2 <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2)
+#  au final le modèle zéro enflé n'améliore pas l'AIC donc on reste sur le modèle binomial négatif
+
+summary(mod)
+Anova(mod)
+```
+
+-0.01 \*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Chrysomeles <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Chrysomeles
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Chrysomèles), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Chrysomèles)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "firebrick4",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "firebrick4",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Leaf beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.7. Coccinelles
+
+```{r}
+mod <- glmmTMB(Coccinelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Coccinelles), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Coccinelles)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Ladybug abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.8. Divers
+
+```{r}
+mod <- glmmTMB(Divers ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Divers), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Divers)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Miscellaneous beetles group abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.9. Staphylins
+
+```{r}
+mod <- glmmTMB(Staphylins ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Staphylins), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Staphylins)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Rove beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+
+
+
+```
+
+## 3.10. Elatéridés
+
+```{r}
+mod <- glmmTMB(Elatéridés ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Elatéridés), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Elatéridés)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Click beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.11. Longicornes
+
+```{r}
+mod <- glmmTMB(Longicornes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.054 \*\*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Longicornes <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Longicornes 
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Longicornes), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Longicornes)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Longhorn beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.12. Malachites
+
+```{r}
+mod <- glmmTMB(Malachites ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.033 \*\*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Malachites <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Malachites
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Malachites), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Malachites)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Soft-wing flower beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.13. Mordelles
+
+```{r}
+mod <- glmmTMB(Mordelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.03 \*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Mordelles <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Mordelles
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Mordelles), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Mordelles)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Tumbling flower beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.14. Oedémérides
+
+```{r}
+mod <- glmmTMB(Oedémérides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.01 \*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Oedemerides <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Oedemerides
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Oedémérides), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = Oedémérides)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "False blister beetle abundance (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p',
+                       breaks = breaks_y  )
+```
+
+## 3.15. Divers petits
+
+```{r}
+mod <- glmmTMB(coleo_year$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+0.17 \*\*\*
+
+```{r}
+coefs <- summary(mod)$coefficients$cond
+IRR <- exp(coefs[, "Estimate"])
+lower <- exp(coefs[, "Estimate"] - 1.96 * coefs[, "Std. Error"])
+upper <- exp(coefs[, "Estimate"] + 1.96 * coefs[, "Std. Error"])
+IRR_table_Divers_petits <- data.frame(
+  Term = rownames(coefs),
+  IRR = IRR,
+  CI_lower = lower,
+  CI_upper = upper
+)
+IRR_table_Divers_petits
+```
+
+```{r}
+newdat <- data.frame(
+  annee = sort(unique(coleo_year$annee))
+)
+
+p <- predict(
+  mod,
+  newdata = newdat,
+  type = "response",
+  se.fit = TRUE,
+  re.form = NA     # prédiction population-level
+)
+
+# Conversion sûre (évite le bug vec_slice)
+fit <- drop(p$fit)
+se  <- drop(p$se.fit)
+
+newdat$fit <- fit
+newdat$lwr <- fit - 1.96 * se
+newdat$upr <- fit + 1.96 * se
+
+breaks_y <- c(seq(0, 100, by = 20), seq(200, max(coleo_year$Oedémérides), by = 100))
+
+ggplot(coleo_year, aes(x = annee, y = `Divers- Petits coléoptères avec antennes en massues`)) +
+  #geom_boxplot(aes(group = annee),
+          #     notch=T,
+           #    notchwidth = 0.4,
+            #   fill="lightgrey",
+             #  alpha=0.3
+                # ) +
+   geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_line(
+    data = newdat,
+    aes(x = annee, y = fit),
+    linewidth = 1.2,
+    color = "aquamarine3",
+    inherit.aes = FALSE
+  ) +
+
+  geom_ribbon(
+    data = newdat,
+    aes(x = annee, ymin = lwr, ymax = upr),
+    fill = "aquamarine3",
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+
+  scale_x_continuous(breaks = unique(coleo_year$annee)) +
+  labs(
+    x = "Year",
+    y = "Miscallenous small beetles (log scale)"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(trans='log1p')
+```
+
+# 4. Richness and abundance
+
+## 4.1. Richesse
+
+```{r}
+richesse <- coleo_year %>% 
+  filter(!is.na(richesse_estimee))
+
+mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle),   data = richesse)
+plot(mod)
+qqmath(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+ggplot(coleo_year, aes(x = factor(annee), y = log1p(coleo_year_estimee))) +
+  geom_jitter(height = 0.1,width=0.2,col="lightgrey") +
+  geom_boxplot(fill="grey")+
+  geom_smooth(aes(group = 1), method = "lm", col = "aquamarine3", se = TRUE) +
+  labs(
+    x = "Year",
+    y = "Log of estimated richness"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 4.2. Abundance
+
+```{r}
+mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),   data = coleo_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+# 5. Per crop type
+
+```{r}
+coleo_annual <- coleo_year %>% 
+  left_join(crop) %>% 
+  filter(crop!="Vineyard")
+
+coleo_vineyard <- coleo_year %>% 
+  left_join(crop) %>% 
+  filter(crop=="Vineyard")
+```
+
+## 5.1. Annual crops
+
+### 5.1.1. Bruches
+
+```{r}
+mod <- glmmTMB(Bruches ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.04 \*\*\*
+
+### 5.1.2. Buprestes
+
+```{r}
+mod <- glmmTMB(Buprestes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.3. Cantharides
+
+```{r}
+mod <- glmmTMB(Cantharides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.4. Carabiques
+
+```{r}
+mod <- glmmTMB(Carabiques ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.04 \*\*\*
+
+### 5.1.5. Charançons
+
+```{r}
+mod <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # excès de zéros, on passe à un modèle zéro enflé
+
+mod2 <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2)
+#  au final le modèle zéro enflé n'améliore pas l'AIC donc on reste sur le modèle binomial négatif
+ 
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.6. Chrysomèles
+
+```{r}
+mod <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # trop de zéros
+
+mod2 <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2)
+#  au final le modèle zéro enflé n'améliore pas l'AIC donc on reste sur le modèle binomial négatif
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.7. Coccinelles
+
+```{r}
+mod <- glmmTMB(Coccinelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.8. Divers
+
+```{r}
+mod <- glmmTMB(Divers ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.9. Staphylins
+
+```{r}
+mod <- glmmTMB(Staphylins ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.10. Elatéridés
+
+```{r}
+mod <- glmmTMB(Elatéridés ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.1.11. Longicornes
+
+```{r}
+mod <- glmmTMB(Longicornes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.06 \*\*\*
+
+### 5.1.12. Malachites
+
+```{r}
+mod <- glmmTMB(Malachites ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.05 \*\*\*
+
+### 5.1.13. Mordelles
+
+```{r}
+mod <- glmmTMB(Mordelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.02 \*
+
+### 5.1.14. Oedémérides
+
+```{r}
+mod <- glmmTMB(Oedémérides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.02 \*\*
+
+### 5.1.15. Divers petits
+
+```{r}
+mod <- glmmTMB(coleo_annual$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.16 \*\*\*
+
+### 5.1.16. Richesse
+
+```{r}
+mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle),   data = coleo_annual)
+plot(mod)
+qqmath(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+0.09 \*
+
+### 5.1.17. Abondance
+
+```{r}
+mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),   data = coleo_annual,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(ab_tot ~ annee + (1| id_parcelle) , data=coleo_annual,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # not better with zero inflation
+
+overdisp_fun(mod) #overdisp ok
+
+summary(mod)
+Anova(mod)
+```
+
+0.008 \*
+
+## 5.2. Vineyards
+
+### 5.2.1. Bruches
+
+```{r}
+mod <- glmmTMB(Bruches ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.2. Buprestes
+
+```{r}
+mod <- glmmTMB(Buprestes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.3. Cantharides
+
+```{r}
+mod <- glmmTMB(Cantharides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.4. Carabiques
+
+```{r}
+mod <- glmmTMB(Carabiques ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.5. Charançons
+
+```{r}
+mod <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # excès de zéros, on passe à un modèle zéro enflé
+
+summary(mod)
+Anova(mod)
+```
+
+-0.04 \*\*\*
+
+### 5.2.6. Chrysomèles
+
+```{r}
+mod <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # trop de zéros
+
+summary(mod)
+Anova(mod)
+```
+
+-0.06 \*\*\*
+
+### 5.2.7. Coccinelles
+
+```{r}
+mod <- glmmTMB(Coccinelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.8. Divers
+
+```{r}
+mod <- glmmTMB(Divers ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns annee
+
+### 5.2.9. Staphylins
+
+```{r}
+mod <- glmmTMB(Staphylins ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.10. Elatéridés
+
+```{r}
+mod <- glmmTMB(Elatéridés ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.11. Longicornes
+
+```{r}
+mod <- glmmTMB(Longicornes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.12. Malachites
+
+```{r}
+mod <- glmmTMB(Malachites ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.13. Mordelles
+
+```{r}
+mod <- glmmTMB(Mordelles ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.14. Oedémérides
+
+```{r}
+mod <- glmmTMB(Oedémérides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.15. Divers petits
+
+```{r}
+mod <- glmmTMB(coleo_vineyard$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.22 \*\*\*
+
+### 5.2.16. Richesse
+
+```{r}
+mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle),   data = coleo_vineyard)
+plot(mod)
+qqmath(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.18 \*\*\*
+
+### 5.1.17. Abondance
+
+```{r}
+mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),   data = coleo_vineyard,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+
+-0.02 \*\*\*
+
+# 6. Temporal trends of traits
+
+## 6.1. Predators
+
+```{r}
+mod <- glmmTMB(predat ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.015 \*\* +/- 0.005 / p = 0.003 \*\*
+
+```{r}
+mod <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(mixed_pred ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mixed_pred ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+-0.011 \*\*
+
+## 6.2. Pests
+
+```{r}
+mod <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+0.01 \*
+
+```{r}
+mod <- glmmTMB(not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(not_pest ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+## 6.3. Flower visitors
+
+```{r}
+mod <- glmmTMB(flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.033 \*\*\* +/- 0.005 p \<0.001 \*\*\*
+
+```{r}
+mod <- glmmTMB(not_flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.01 \*\*\*
+
+```{r}
+mod <- glmmTMB(mixed_flovis~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mixed_flovis ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_year)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+-0.011 \*
+
+# 7. Temporal trends of traits per crop type
+
+## 7.1. Annual crops
+
+### 7.1.1. Predators
+
+```{r}
+mod <- glmmTMB(predat ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+0.017 \*\*
+
+```{r}
+mod <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+0.01 \*\*
+
+```{r}
+mod <- glmmTMB(mixed_pred ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mixed_pred ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+-0.015 \*\*
+
+### 7.1.2. Pests
+
+```{r}
+mod <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+0.01 \*\*
+
+```{r}
+mod <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+0.02 \*\*
+
+```{r}
+mod <- glmmTMB(not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(not_pest ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 7.1.3. Flower visitors
+
+```{r}
+mod <- glmmTMB(flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(flovis ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+0.04 \*\*\*
+
+```{r}
+mod <- glmmTMB(not_flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(mixed_flovis~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_annual)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+mod2 <- glmmTMB(mixed_flovis ~ annee + (1 | id_parcelle), family = nbinom2, ziformula = ~1, data = coleo_annual)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) #keep mod
+
+summary(mod)
+Anova(mod)
+```
+
+-0.013 \*
+
+## 7.2. Vineyards
+
+### 7.2.1. Predators
+
+```{r}
+mod <- glmmTMB(predat ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.03 \*\*\*
+
+```{r}
+mod <- glmmTMB(mixed_pred ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 7.2.2. Pests
+
+```{r}
+mod <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.04 \*\*\*
+
+```{r}
+mod <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 7.2.3. Flower visitors
+
+```{r}
+mod <- glmmTMB(flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+```{r}
+mod <- glmmTMB(not_flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+
+-0.04 \*\*\*
+
+```{r}
+mod <- glmmTMB(mixed_flovis~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_vineyard)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+
+summary(mod)
+Anova(mod)
+```
+
+ns

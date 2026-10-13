@@ -1,0 +1,209 @@
+---
+title: "3.1. cwm_plant_traits"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open data
+
+```{r}
+select <- dplyr::select
+library(vegan)
+library(FD)
+library(tidyverse)
+
+traits_brut <- read.csv(file="3.glmm_morphogroups_plant_traits/3.1.cwm_plant_traits/input/plant_traits_500ENI.csv") %>% 
+  select(-X) 
+
+flore <- read.csv(file="3.glmm_morphogroups_plant_traits/3.1.cwm_plant_traits/input/flore_long2023.csv",sep=",") %>% 
+  select(-X) %>% 
+  mutate(annee=ifelse(annee=="19","2019",
+                     ifelse(annee=="20","2020",annee))) 
+
+
+
+```
+
+In the name traits dataframe we have the names of the species for which we have at least one trait
+
+# 2. Clean traits
+
+```{r}
+plant_traits_num <- traits_brut %>% 
+  select(nom.eni,nat_val,pink,white,yellow,green,blue,purple,nectar,Height_max,Seed_mass_NA,SLA_NA,Flow_on,Flow_dur,EIV_N,graminoids,pollination_mode,life_cycle,weeds_annual_crops,weeds_market_crops,weeds_vineyards) %>% 
+  mutate(pollmode=as.factor(pollination_mode)) %>% 
+  mutate(nectar_num=ifelse(nectar=="none","0","1")) %>% 
+  mutate(forbs_num=ifelse(graminoids=="forbs","1","0")) %>% 
+  mutate(nat_val_num = ifelse(nat_val == "nat_val", 1,
+                            ifelse(is.na(nat_val), 1, 0))) %>% 
+  mutate(weeds_annual_crops_num = ifelse(weeds_annual_crops == "yes", 1,
+                            ifelse(is.na(weeds_annual_crops), 0, 0))) %>% 
+  mutate(weeds_market_crops_num = ifelse(weeds_market_crops == "yes", 1,
+                            ifelse(is.na(weeds_market_crops), 0, 0))) %>% 
+  mutate(weeds_vineyards_num = ifelse(weeds_vineyards == "yes", 1,
+                            ifelse(is.na(weeds_vineyards), 0, 0))) %>% 
+  mutate(nat_val_num = replace_na(nat_val_num, 1)) %>% 
+  mutate(life_cycle=ifelse(life_cycle=="perennial","1","0")) %>% 
+  rename(perennial_num=life_cycle) %>% 
+  mutate(pollmode_num = ifelse(pollmode == "entomogame","2",
+            ifelse(pollmode == "entomogame. anemogame","1",
+            ifelse(pollmode == "entomogame. autogame","1",
+            ifelse(pollmode == "entomogame. apogame","1","0"))))) %>%
+  mutate(nectar_num=as.integer(nectar_num),
+          forbs_num=as.integer(forbs_num),
+         nat_val_num=as.integer(nat_val_num),
+           perennial_num=as.integer(perennial_num),
+            pollmode_num=as.integer(pollmode_num),
+         weeds_market_crops_num=as.integer(weeds_market_crops_num),
+         weeds_vineyards_num=as.integer(weeds_vineyards_num),
+         weeds_annual_crops_num=as.integer(weeds_annual_crops_num)
+         ) %>% 
+  group_by(nom.eni) %>% 
+  summarise_if(is.numeric,mean,na.rm=F) %>% 
+  filter(rowSums(is.na(.)) <= 6)  #supprime les lignes où on a des NA pour 6 ou plus des 14 variables
+
+names_traits <-  plant_traits_num %>% 
+  select(nom.eni) %>% 
+  distinct()
+
+```
+
+# 3. Select only species with traits and turn it to wide format, pooling all years at the plot scale
+
+```{r}
+flore_long <- flore %>% 
+  filter(nom.eni %in% names_traits$nom.eni) 
+
+flore_traits_sp <- flore %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_tot = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_sp_traits = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  mutate(completude = ab_sp_traits/ab_tot*100) %>%
+  filter(completude > 79.99) %>% 
+  # check completude in order to eliminate communities with completude < 80
+  # from 68516 to 62089 lines
+  # from 4656 to 4098 samples (1 plot/year)
+  select(-ab_tot,-ab_sp_traits,-completude) %>% 
+  mutate(id_uniq = paste(id_parcelle, annee, sep = "_")) %>% 
+  select(id_uniq,nom.eni,ab_pl) %>% 
+  group_by(id_uniq,nom.eni) %>% 
+  summarise(ab_pl=sum(ab_pl)) %>% #i sum the lines for which we have the same species twice on the same site the same year but with 2 different abundance scores (5 lines)
+  distinct() #%>% 
+  #pivot_wider(names_from="nom.eni",
+             # values_from = "ab_pl",
+              #values_fill=0) 
+
+
+names_traits_sp <- flore %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_tot = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_sp_traits = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  mutate(completude = ab_sp_traits/ab_tot*100) %>%
+  filter(completude > 79.99) %>% 
+  select(nom.eni) %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  distinct()
+```
+
+In our traits dataset we have some species that we did not find in our botanical sampling, we have to remove them from the traits dataset
+
+```{r}
+traits_dataset_species <- plant_traits_num %>% 
+  distinct() %>% 
+   filter(nom.eni %in% names_traits_sp$nom.eni) %>% 
+  mutate(across(where(is.integer), as.numeric))
+```
+
+# 4. Measure CWM
+
+```{r}
+ou_na <- traits_dataset_species %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "column", values_to = "na_count")
+
+traits_dataset_species <- traits_dataset_species %>% 
+  mutate(Seed_mass_NA = ifelse(is.na(Seed_mass_NA), 
+                               mean(Seed_mass_NA, na.rm = TRUE), 
+                               Seed_mass_NA)) %>% 
+  mutate(SLA_NA = ifelse(is.na(SLA_NA), 
+                               mean(SLA_NA, na.rm = TRUE), 
+                               SLA_NA))
+
+
+cwms <- flore_traits_sp %>% 
+  left_join(traits_dataset_species) %>% 
+  group_by(id_uniq) %>% 
+  mutate(sum_ab=sum(ab_pl)) %>% 
+  mutate(
+    CWM_white = sum(white*ab_pl/sum_ab),
+    CWM_yellow = sum(yellow*ab_pl/sum_ab),
+    CWM_green = sum(green*ab_pl/sum_ab),
+    CWM_blue = sum(blue*ab_pl/sum_ab),
+    CWM_height_max = sum(Height_max*ab_pl/sum_ab),
+    CWM_seed_mass = sum(Seed_mass_NA*ab_pl/sum_ab),
+    CWM_flow_on = sum(Flow_on*ab_pl/sum_ab),
+    CWM_flow_dur = sum(Flow_dur*ab_pl/sum_ab),
+    CWM_EIV_N = sum(EIV_N*ab_pl/sum_ab),
+    CWM_perennial = sum(perennial_num*ab_pl/sum_ab),
+    CWM_nectar = sum(nectar_num*ab_pl/sum_ab),
+    CWM_nat_val = sum(nat_val_num*ab_pl/sum_ab),
+    CWM_forbs = sum(forbs_num*ab_pl/sum_ab),
+    CWM_pollmode = sum(pollmode_num*ab_pl/sum_ab),
+    CWM_SLA = sum(SLA_NA*ab_pl/sum_ab),
+    CWM_weeds_annual = sum(weeds_annual_crops_num*ab_pl/sum_ab),
+    CWM_weeds_market = sum(weeds_market_crops_num*ab_pl/sum_ab),
+    CWM_weeds_vineyards = sum(weeds_vineyards_num*ab_pl/sum_ab),
+    ) %>% 
+  select(id_uniq, CWM_white, CWM_yellow ,CWM_green, CWM_blue ,CWM_height_max,CWM_seed_mass,CWM_flow_on,CWM_flow_dur,CWM_EIV_N,CWM_perennial,CWM_nectar,CWM_forbs,CWM_nat_val,CWM_pollmode,CWM_weeds_annual,CWM_weeds_market,CWM_weeds_vineyards) %>% 
+  distinct()
+```
+
+# 5. Abundance and richness
+
+```{r}
+ab_pl <- flore %>%  
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_pl = sum(ab_pl)) %>% 
+  select(id_parcelle,annee,ab_pl) %>% 
+  distinct() %>% 
+  mutate(id_uniq = paste(id_parcelle, annee, sep = "_")) %>% 
+  relocate(id_uniq,id_parcelle, annee)
+
+richness_pl <- flore %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(rich_sp_pl = n_distinct(nom.eni)) %>% 
+  select(id_parcelle,annee,rich_sp_pl) %>% 
+  distinct() %>% 
+  mutate(id_uniq = paste(id_parcelle, annee, sep = "_")) %>% 
+  relocate(id_uniq,id_parcelle, annee)
+
+ab_rich_pl <- ab_pl %>% 
+  left_join(richness_pl)
+```
+
+# 6. Pool dataset
+
+```{r}
+plant_ind <- cwms %>% 
+  left_join(ab_rich_pl) %>% 
+  relocate(id_uniq,id_parcelle,annee)
+```
+
+
+# 6. Save data
+
+```{r}
+#write.csv(plant_ind,file="3.glmm_morphogroups_plant_traits/3.1.cwm_plant_traits/output/plants_indicators_per_year_and_field.csv")
+
+#write.csv(ab_rich_pl,file="3.glmm_morphogroups_plant_traits/3.1.cwm_plant_traits/output/plantab_and_richness_per_year_and_field.csv")
+```

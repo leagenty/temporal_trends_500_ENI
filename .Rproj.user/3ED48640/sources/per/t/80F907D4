@@ -1,0 +1,32 @@
+{
+    "id": "80F907D4",
+    "path": "~/Post-doc_INRAE_102026-102027/temporal_trends_500_ENI/1. clean_dataset.qmd",
+    "project_path": "1. clean_dataset.qmd",
+    "type": "quarto_markdown",
+    "hash": "3549835725",
+    "contents": "",
+    "dirty": false,
+    "created": 1791793444344.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "chunk_output_type": "console",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "cursorPosition": "69,10",
+        "scrollLine": "0",
+        "rmdVisualModeLocation": "2:0",
+        "rmdVisualCollapsedChunks": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1791811404,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1791811404312,
+    "read_only": false,
+    "read_only_alternatives": []
+}

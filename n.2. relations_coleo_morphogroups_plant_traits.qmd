@@ -1,0 +1,266 @@
+---
+title: "3.3. relations_coleo_morphogroups_plant_traits"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open dataset
+
+```{r}
+library(tidyverse)
+library(FactoMineR)
+library(lubridate)
+library(factoextra)
+library(corrplot)
+library(lme4)
+library(MuMIn)
+library(MASS)
+library(AICcmodavg)
+library(car)
+library(ggpubr)
+select <- dplyr::select
+
+plant_ind<- read.csv(file="3.glmm_morphogroups_plant_traits/3.2.relations_coleo_morphogroups_plant_traits/input/plants_indicators_per_year_and_field.csv") %>% 
+  select(-X) 
+
+morphog <- read.csv(file="3.glmm_morphogroups_plant_traits/3.2.relations_coleo_morphogroups_plant_traits/input/morphog_wide.csv") %>% 
+  select(-X) 
+```
+
+# 2. Pool data
+
+```{r}
+plant_coleo <- morphog %>% 
+  left_join(plant_ind) 
+
+ou_na <- plant_coleo %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "column", values_to = "na_count")
+
+plant_coleo <-plant_coleo %>% 
+  filter(!is.na(CWM_white))
+```
+
+# 3. Models
+
+## 3.1. Bruches
+
+```{r}
+mod <- lmer(Bruches~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs + (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Bruches~ rich_sp_pl  +  CWM_EIV_N+ CWM_forbs  + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet neg CWM EIV N
+Effets pos CWM forbs et rich sp
+
+
+## 3.2. Buprestes
+
+```{r}
+mod <- lmer(Buprestes~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+```
+
+ns
+
+## 3.3. Cantharides
+
+```{r}
+mod <- lmer(Cantharides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Cantharides~  rich_sp_pl+ CWM_EIV_N+ CWM_pollmode + CWM_perennial+(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effets pos CWM EIV N, CWM pérennes, richesse spé
+Effet neg CWM pollmode (=entomog)
+
+## 3.4. Carabiques
+
+```{r}
+mod <- lmer(Carabiques~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial +  CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Carabiques~ CWM_forbs  + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet neg prop dicot **
+
+## 3.5. Charançons
+
+```{r}
+mod <- lmer(Charancons~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Charancons~ rich_sp_pl + CWM_flow_on + CWM_perennial + CWM_forbs  + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos CWM forbs, pérennes et richesse
+Effet neg CWM flow on
+
+## 3.6. Chrysomèles
+
+```{r}
+mod <- lmer(Chrysomeles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ CWM_forbs +(1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Chrysomeles~ ab_pl + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos richesse
+Effet neg abondance
+
+
+## 3.7. Coccinelles
+
+```{r}
+mod <- lmer(Coccinelles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Coccinelles~ CWM_forbs + CWM_perennial + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos pérennes et richesse
+Effet neg dicot
+
+## 3.8. Divers
+
+```{r}
+mod <- lmer(Divers~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Divers~ rich_sp_pl + CWM_flow_on  + CWM_perennial +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos richesse et CWM flow on
+Effet neg prop pérennes
+
+## 3.9. Divers - petits coléoptères avec antennes en massues
+
+```{r}
+mod <- lmer(plant_coleo$Divers..Petits.coleopteres.avec.antennes.en.massues~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(plant_coleo$Divers..Petits.coleopteres.avec.antennes.en.massues~ CWM_height_max + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos CWM hauteur et richesse sp
+
+## 3.10. Elatéridés
+
+```{r}
+mod <- lmer(Elaterides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Elaterides~ CWM_forbs + rich_sp_pl +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet neg forbs
+Effet pos richesse
+
+## 3.11. Longicornes
+
+```{r}
+mod <- lmer(Longicornes~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_forbs + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Longicornes~  rich_sp_pl + CWM_height_max +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effets pos prop entomogames, rich sp et cwm height
+
+## 3.13. Malachites
+
+```{r}
+mod <- lmer(Malachites~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_forbs + CWM_EIV_N + (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Malachites~ rich_sp_pl+CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos richesse 
+Effet neg cwm eiv N, prop dicot
+
+## 3.13. Mordelles
+
+```{r}
+mod <- lmer(Mordelles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Mordelles~  rich_sp_pl + CWM_height_max + CWM_EIV_N +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos richesse, CWM hauteur
+Effet neg CWM EIV N
+
+## 3.14. Oedémérides
+
+```{r}
+mod <- lmer(Oedemerides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Oedemerides~ CWM_EIV_N + CWM_perennial+ rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos richesse
+Effets neg CWM EIV N et pérennes
+
+
+## 3.15. Staphylins
+
+```{r}
+mod <- lmer(Staphylins~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial  + CWM_EIV_N+ CWM_forbs+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Staphylins~ ab_pl + CWM_forbs + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Effet pos abondance
+Effet neg dicot

@@ -1,0 +1,1073 @@
+---
+title: "7. clusters_intensity_practices"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Data and packages
+
+```{r}
+library(tidyverse)
+library(FactoMineR)
+library(factoextra)
+library(ggpubr)
+library(DHARMa)
+library(glmmTMB)
+library(car)
+library(broom.mixed)
+library(emmeans)
+library(ggeffects)
+select <- dplyr::select
+
+agri <- read.csv("7.clusters_intensity_practices/input/agro_data_per_field_and_year.csv") %>% 
+  select(-X) %>% 
+  mutate(id_parcelle=as.character(id_parcelle),
+    id_uniq=paste(id_parcelle,year,sep="_"))
+
+theme_graphique<- theme(panel.border = element_blank(),
+                         panel.grid.major = element_blank(),
+                         panel.grid.minor = element_blank(),
+                         panel.background = element_blank(),
+                         axis.line = element_line(colour = "black"),
+                  strip.background=element_rect(colour="grey",fill="white"))
+```
+
+# 1. Filter dataset without any NA
+
+```{r}
+agri_comp <- agri %>%
+  mutate(nbre_autres_pesticides = nbre_pesticides - (nbre_herbicides+nbre_insecticides)) %>% 
+  select(id_uniq,id_parcelle,year,largeur_bordure,nbre_interv,CoefN,nbre_insecticides,nbre_herbicides,nbre_autres_pesticides,type_production,TypeCulture) %>% 
+  drop_na() %>% 
+  group_by(id_parcelle) %>% 
+  mutate(nbre_annee= n_distinct(year)) %>% 
+  ungroup() %>% 
+  filter(nbre_annee>7) %>% 
+  select(-nbre_annee)#%>% 
+  #select(id_parcelle) %>% 
+  #distinct() 
+```
+
+# 2. Run PCA
+
+```{r}
+agri_pca <- agri_comp %>% 
+  filter(id_uniq!="389_2022") %>% 
+  column_to_rownames("id_uniq") %>% 
+  select(-id_parcelle,-year) %>% 
+  rename(
+    margin_width=largeur_bordure,
+    nitrogen_fertilization=CoefN,
+    nbr_herbicides=nbre_herbicides,
+    nbr_interventions=nbre_interv,
+    nbr_fungicides=nbre_autres_pesticides,
+    nbr_insecticides=nbre_insecticides,
+    crop_type = TypeCulture,
+    production_type = type_production) %>% 
+mutate(crop_type = 
+             ifelse(crop_type=="GrandesCultures","annual_crops",
+              ifelse(crop_type=="Maraichage","market_gardening","vineyard")))
+
+names <- agri_comp %>% 
+  filter(id_uniq!="389_2022") %>% 
+  select(id_uniq)
+
+res.pca <- PCA(agri_pca,quali.sup = 7:8)
+
+fviz_pca_biplot(res.pca, 
+                axes =c(1,2),
+                col.var = "black", 
+              habillage = as.factor(agri_pca$crop_type),
+   label="var",
+    )+
+  scale_color_manual(values = c("orange", "seagreen","purple")) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )
+
+
+fviz_pca_biplot(res.pca, 
+                axes =c(1,2),
+                col.var = "black", 
+              habillage = as.factor(agri_pca$production_type),
+   label="var") +
+  scale_color_manual(values = c("grey75", "green4"))+
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )
+
+
+fviz_eig(res.pca)
+
+fviz_pca_var(res.pca, 
+                axes =c(3,4))
+
+r <- dimdesc(res.pca, axes = c(1,2), proba = 0.05)
+r$Dim.1
+r$Dim.2
+
+
+rr <-dimdesc(res.pca, axes = c(3,4), proba = 0.05)
+dim3 <- as_tibble(rr$Dim.3$quanti)
+rr$quanti
+
+
+
+```
+
+# 3. Create clusters
+
+Old code about clusters
+
+```{r}
+cah <-HCPC(res.pca,nb.clust=2)
+
+fviz_cluster(cah,
+             repel=F,
+             show.clust.cent=T,
+             palette="jco",
+             ggtheme=theme_minimal(),
+             main="Factor map")+
+   scale_colour_manual(values = c("orange3", "maroon4")) 
+
+id_year <- agri_comp %>% 
+  select(id_uniq,year,id_parcelle) 
+clusters <- as_tibble(cah$data.clust) %>% 
+  cbind(names) %>% 
+  relocate(id_uniq) %>% 
+  left_join(id_year)
+
+cah$desc.var$quanti
+cah$desc.var$quali
+summary(clusters)
+
+#write.csv(clusters,"7.clusters_intensity_practices/output/clusters.csv")
+```
+
+# 4. Cluster description
+
+```{r}
+cah$desc.var$quanti
+summary(clusters)
+
+cluster1 <- clusters %>% 
+  filter(clust==1)
+summary(cluster1) # quasi que grandes cultures
+# 1/28 bio
+# 1514
+# + CoefN, + nbre herbicides, 
+# - largeur bordure, - nbre interv, - nbre insecticides, -- fongicides
+
+cluster2 <- clusters %>% 
+  filter(clust==2) # quasi que vignes
+# 1/5 bio
+# 514
+# +++ fongicides, + insecticides, + nbre interv, + largeur bordure
+# - nbre herbicides, -- CoefN
+summary(cluster2)
+```
+
+
+```{r}
+kruskal.test(largeur_bordure~clust,data=clusters) # cluster 2
+ggplot(aes(x=clust,y=largeur_bordure,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Margin width (m)")+
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+
+kruskal.test(nbre_interv ~clust,data=clusters) # cluster 2
+ggplot(aes(x=clust,y=nbre_interv,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Number of interventions on the margin")+
+  theme(axis.text=element_text(size=),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  theme(legend.position="none")+
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+
+kruskal.test(CoefN~clust,data=clusters) # cluster 1
+ggplot(aes(x=clust,y=CoefN,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Dose of nitrogen fertilization")+
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  theme(legend.position="none")+
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+
+kruskal.test(nbre_insecticides~clust,data=clusters) # cluster 2$
+ggplot(aes(x=clust,y=nbre_insecticides,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Number of applied insecticides")+
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  theme(legend.position="none")+
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+
+kruskal.test(nbre_herbicides~clust,data=clusters)  # cluster 1
+ggplot(aes(x=clust,y=nbre_herbicides,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Number of applied herbicides")+
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  theme(legend.position="none")+
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+
+kruskal.test(nbre_autres_pesticides~clust,data=clusters) # cluster 2
+ggplot(aes(x=clust,y=nbre_autres_pesticides,fill=clust),data=clusters) +
+  geom_boxplot() + 
+  scale_fill_manual(values=c("orange3","maroon4"))+
+  labs(x="Management intensity cluster",y="Number of applied fungicides")+
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=20))+ 
+  theme_graphique +
+  theme(legend.position="none")+
+  stat_compare_means(method = "kruskal.test", label.x = 2)
+```
+
+# 5. Temporal trends according to cluster
+```{r}
+clust <- clusters %>% 
+  select(id_parcelle,year,clust)
+
+plants_year <- read.csv("7.clusters_intensity_practices/input/plants_year.csv") %>% 
+  mutate(id_parcelle=as.character(id_parcelle)) %>% 
+  select(-X) %>% 
+  left_join(clust)
+
+coleo_year <- read.csv("7.clusters_intensity_practices/input/coleo_year.csv") %>% 
+  select(-X,-X.1) %>% 
+  mutate(year=annee) %>% 
+  mutate(id_parcelle=as.character(id_parcelle)) %>% 
+  left_join(clust)
+
+```
+
+## 5.1. Beetles
+
+### 5.1.1. Bruches
+
+```{r}
+mod <- glmmTMB(Bruches ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+just year
+
+### 5.1.2. Buprestes
+
+```{r}
+mod <- glmmTMB(Buprestes ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+ns
+
+### 5.1.3. Cantharides
+
+```{r}
+mod <- glmmTMB(Cantharides ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+effets clust *** et interaction *
+year : 0.069 dans le cluster 2, ns dans le 1
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Predicted soldier beetle abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.1.4. Carabiques
+
+```{r}
+mod <- glmmTMB(Carabiques ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+effet year * et clust **
+
+### 5.1.5. Charançons
+
+```{r}
+mod <- glmmTMB(Charançons ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+clust *
+
+### 5.1.6. Chrysomèles
+
+```{r}
+mod <- glmmTMB(Chrysomèles ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+annee ns
+clust signif
+interaction * : effet neg annee dans cluster 2
+
+--> « Le modèle binomial négatif mixte met en évidence un effet significatif du cluster sur l’abondance des chrysomèles ainsi qu’une interaction significative entre l’année et le cluster.
+Alors qu’une augmentation significative des abondances est observée dans le cluster 1, la tendance temporelle est non significative dans le cluster 2, ce qui explique l’absence d’effet global de l’année lorsque les deux clusters sont considérés conjointement. »
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Predicted leaf beetle abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+
+### 5.1.7. Coccinelles
+
+```{r}
+mod <- glmmTMB(Coccinelles ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+clust trend
+interaction *** : effet pos dans cluster 2
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Predicted ladybug abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.1.8. Divers
+
+```{r}
+mod <- glmmTMB(Divers ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+just year
+
+### 5.1.9. Staphylins
+
+```{r}
+mod <- glmmTMB(Staphylins ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+clust ***
+
+### 5.1.10. Elatéridés
+
+```{r}
+mod <- glmmTMB(Elatéridés ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+ns
+
+### 5.1.11. Longicornes
+
+```{r}
+mod <- glmmTMB(Longicornes ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+year *** et clust *
+
+### 5.1.12. Malachites
+
+```{r}
+mod <- glmmTMB(Malachites ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+just year ***
+
+### 5.1.13. Mordelles
+
+```{r}
+mod <- glmmTMB(Mordelles ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+clust *
+
+### 5.1.14. Oedémérides
+
+```{r}
+mod <- glmmTMB(Oedémérides ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+```
+just year
+
+### 5.1.15. Divers petits
+
+```{r}
+mod <- glmmTMB(coleo_year$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year * clust + (1 | id_parcelle), family = nbinom2, data = coleo_year)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+just year
+
+### 5.1.16. Abondance
+
+```{r}
+mod <- glmmTMB(ab_tot ~ year * clust +  (1 | id_parcelle),   data = coleo_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+year *** and interaction : effet year pos cluster 1
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Total beetle abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.1.17. Predators
+```{r}
+mod <- glmmTMB(predat ~ year * clust +  (1 | id_parcelle),   data = coleo_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+year*** cluster ***
+
+### 5.1.18. Flower visitors
+```{r}
+mod <- glmmTMB(flovis ~ year * clust +  (1 | id_parcelle),   data = coleo_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+ns
+
+### 5.1.19. Pests
+```{r}
+mod <- glmmTMB(mostly_pest ~ year * clust +  (1 | id_parcelle),   data = coleo_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+year *** and interaction **: effet pos dans cluster 1
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Pest morphogroups abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+
+## 5.2. Plants
+
+### 5.2.1. Poaceae
+
+```{r}
+mod <- glmmTMB(Poaceae ~ year * clust +  (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Poaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+year **
+clust **
+interaction *** : effet pos dans cluster 2
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Poaceae abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.2.2. Asteraceae
+
+```{r}
+mod <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+clust *
+
+### 5.2.3. Fabaceae
+
+```{r}
+mod <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+year *
+clust *
+
+### 5.2.4. Plantaginaceae
+
+```{r}
+mod <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+year **
+interaction ** : effet neg clust 1
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Plantaginaceae abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.2.5. Convolvulaceae
+
+```{r}
+mod <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+interaction * : effet pos dans cluster 2
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Convolvulaceae abundances",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.2.6. Rosaceae
+
+```{r}
+mod <- glmmTMB(Rosaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+ns
+
+### 5.2.7. Geraniaceae
+
+```{r}
+mod <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+ns
+
+### 5.2.8. Apiaceae
+
+```{r}
+mod <- glmmTMB(Apiaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.9. Polygonaceae
+
+```{r}
+mod <- glmmTMB(Polygonaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+clust *
+
+### 5.2.10. Rubiaceae
+
+```{r}
+mod <- glmmTMB(Rubiaceae  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 5.2.11. Richness
+
+```{r}
+mod <- glmmTMB(richness  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+trend interaction : effet pos dans cluster 2
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Plant richness",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+
+### 5.2.12. Abundance
+
+```{r}
+mod <- glmmTMB(abundance  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+Anova(mod)
+tr <- emtrends(mod, ~ clust, var = "year")
+test(tr)
+```
+interaction ***: effet pos dans cluster 2
+
+### fig
+```{r}
+pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+
+ggplot(pred, aes(x = x, y = predicted, colour = group)) +
+   scale_color_manual(values=c("orange3","maroon4"))+
+  scale_fill_manual(values=c("orange3","maroon4")) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.1, colour = NA) +
+  labs(
+    x = "Year",
+    y = "Plant abundance",
+    colour = "Cluster",
+    fill = "Cluster"
+  ) +
+  theme(
+    legend.position = "top",
+    text = element_text(size = 12)
+  )+
+  scale_x_continuous(breaks = seq(min(coleo_year$year), max(coleo_year$year), by = 2),labels = seq(min(coleo_year$year), max(coleo_year$year), by = 2)) +
+    theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16))+ 
+  theme_graphique
+```
+

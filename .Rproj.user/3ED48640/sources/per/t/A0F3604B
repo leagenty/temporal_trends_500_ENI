@@ -1,0 +1,32 @@
+{
+    "id": "A0F3604B",
+    "path": "~/Post-doc_INRAE_102026-102027/temporal_trends_500_ENI/4. traits_per_morphogroups.qmd",
+    "project_path": "4. traits_per_morphogroups.qmd",
+    "type": "quarto_markdown",
+    "hash": "916130678",
+    "contents": "",
+    "dirty": false,
+    "created": 1791882790920.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "chunk_output_type": "console",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "rmdVisualCollapsedChunks": "",
+        "rmdVisualModeLocation": "119:0",
+        "cursorPosition": "19,0",
+        "scrollLine": "3"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1791459314,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1791459314,
+    "read_only": false,
+    "read_only_alternatives": []
+}

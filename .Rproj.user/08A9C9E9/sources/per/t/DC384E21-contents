@@ -1,0 +1,434 @@
+---
+title: "3.3. relations_coleo_morphogroups_plant_traits"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open dataset
+
+```{r}
+library(tidyverse)
+library(FactoMineR)
+library(lubridate)
+library(factoextra)
+library(corrplot)
+library(lme4)
+library(MuMIn)
+library(MASS)
+library(AICcmodavg)
+library(car)
+library(ggpubr)
+select <- dplyr::select
+
+plant_ind<- read.csv(file="3.glmm_morphogroups_plant_traits/3.3.relations_coleo_morphogroups_plant_traits/input/plants_indicators_per_year_and_field.csv") %>% 
+  select(-X) 
+
+morphog <- read.csv(file="3.glmm_morphogroups_plant_traits/3.3.relations_coleo_morphogroups_plant_traits/input/morphog_wide.csv") %>% 
+  select(-X) 
+```
+
+# 2. Pool data
+
+```{r}
+plant_coleo <- morphog %>% 
+  left_join(plant_ind) 
+
+ou_na <- plant_coleo %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "column", values_to = "na_count")
+
+plant_coleo <-plant_coleo %>% 
+  filter(!is.na(CWM_white))
+```
+
+# 3. Models
+
+## 3.1. Bruches
+
+```{r}
+mod <- lmer(Bruches~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Bruches~ rich_sp_pl + CWM_perennial +  CWM_EIV_N + CWM_flow_on + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)    11.3994     4.2144   2.705
+rich_sp_pl      0.1587     0.0287   5.530
+CWM_perennial  -2.8212     1.1761  -2.399
+CWM_EIV_N      -2.1270     0.5013  -4.243
+CWM_flow_on     0.9982     0.4784   2.087
+
+Response: Bruches
+                Chisq Df Pr(>Chisq)    
+rich_sp_pl    30.5772  1  3.208e-08 ***
+CWM_perennial  5.7539  1    0.01645 *  
+CWM_EIV_N     18.0026  1  2.206e-05 ***
+CWM_flow_on    4.3537  1    0.03693 *
+
+ R2m       R2c
+0.02458146 0.1600353
+
+
+## 3.3. Buprestes
+
+```{r}
+mod <- lmer(Buprestes~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+```
+ns
+
+## 3.3. Cantharides
+
+```{r}
+mod <- lmer(Cantharides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Cantharides~   CWM_EIV_N + CWM_perennial+(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)    -3.0744     2.8118  -1.093
+CWM_EIV_N       0.7557     0.4065   1.859
+CWM_perennial   3.6929     0.8943   4.129
+
+Response: Cantharides
+                Chisq Df Pr(>Chisq)    
+CWM_EIV_N      3.4566  1      0.063 .  
+CWM_perennial 17.0517  1  3.638e-05 ***
+
+R2m       R2c
+0.005655634 0.2447485
+
+## 3.4. Carabiques
+
+```{r}
+mod <- lmer(Carabiques~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Carabiques~ CWM_perennial + CWM_pollmode  + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)     0.8524     0.2604   3.273
+CWM_perennial   0.6364     0.2906   2.190
+CWM_pollmode   -0.4190     0.2110  -1.985
+
+Response: Carabiques
+               Chisq Df Pr(>Chisq)  
+CWM_perennial 4.7969  1    0.02851 *
+CWM_pollmode  3.9416  1    0.04711 *
+
+R2m       R2c
+0.002713787 0.1011546
+
+## 3.5. Charançons
+
+```{r}
+mod <- lmer(Charancons~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Charancons~ CWM_perennial + CWM_pollmode  + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)      5.504      2.246   2.451
+CWM_perennial    9.303      2.460   3.781
+CWM_pollmode     8.764      1.808   4.848
+
+Response: Charancons
+               Chisq Df Pr(>Chisq)    
+CWM_perennial 14.296  1  0.0001562 ***
+CWM_pollmode  23.506  1  1.245e-06 ***
+
+R2m       R2c
+0.01216256 0.2240436
+
+
+## 3.6. Chrysomèles
+
+```{r}
+mod <- lmer(Chrysomeles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Chrysomeles~ ab_pl + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+            Estimate Std. Error t value
+(Intercept) 23.44353    1.62582  14.419
+ab_pl       -0.11320    0.03637  -3.113
+rich_sp_pl   0.30954    0.15095   2.051
+
+Response: Chrysomeles
+            Chisq Df Pr(>Chisq)   
+ab_pl      9.6895  1   0.001853 **
+rich_sp_pl 4.2053  1   0.040298 * 
+
+R2m R2c
+0.002908515 0.1026806
+
+## 3.7. Coccinelles
+
+```{r}
+mod <- lmer(Coccinelles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Coccinelles~ CWM_perennial + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)    2.73551    1.19230   2.294
+CWM_perennial  4.29191    1.27105   3.377
+rich_sp_pl     0.13261    0.03362   3.945
+
+Response: Coccinelles
+               Chisq Df Pr(>Chisq)    
+CWM_perennial 11.402  1  0.0007337 ***
+rich_sp_pl    15.560  1  7.994e-05 ***
+
+             R2m       R2c
+[1,] 0.007627582 0.2450454
+
+## 3.8. Divers
+
+```{r}
+mod <- lmer(Divers~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Divers~ CWM_flow_on  + WM_perennial +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)    2.73551    1.19230   2.294
+CWM_perennial  4.29191    1.27105   3.377
+rich_sp_pl     0.13261    0.03362   3.945
+
+Response: Coccinelles
+               Chisq Df Pr(>Chisq)    
+CWM_perennial 11.402  1  0.0007337 ***
+rich_sp_pl    15.560  1  7.994e-05 ***
+
+R2m           R2c
+0.007627582 0.2450454
+
+
+## 3.9. Divers - petits coléoptères avec antennes en massues
+
+```{r}
+mod <- lmer(plant_coleo$Divers..Petits.coleopteres.avec.antennes.en.massues~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(plant_coleo$Divers..Petits.coleopteres.avec.antennes.en.massues~ CWM_height_max + rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+               Estimate Std. Error t value
+(Intercept)      0.5660     3.3638   0.168
+CWM_height_max   5.4937     1.9688   2.790
+rich_sp_pl       0.4942     0.1455   3.396
+
+Response: plant_coleo$Divers..Petits.coleopteres.avec.antennes.en.massues
+                 Chisq Df Pr(>Chisq)    
+CWM_height_max  7.7861  1  0.0052651 ** 
+
+R2m         R2c
+0.006533153 0.09162069
+
+## 3.10. Elatéridés
+
+```{r}
+mod <- lmer(Elaterides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Elaterides~ CWM_pollmode + rich_sp_pl +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+             Estimate Std. Error t value
+(Intercept)   2.59223    0.47365   5.473
+CWM_pollmode -1.38270    0.53128  -2.603
+rich_sp_pl    0.06840    0.01909   3.582
+
+Response: Elaterides
+               Chisq Df Pr(>Chisq)    
+CWM_pollmode  6.7733  1  0.0092530 ** 
+rich_sp_pl   12.8321  1  0.0003407 ***
+
+R2m         R2c
+0.004951887 0.25114
+
+## 3.11. Longicornes
+
+```{r}
+mod <- lmer(Longicornes~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Longicornes~CWM_pollmode  + rich_sp_pl + CWM_height_max +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+                Estimate Std. Error t value
+(Intercept)    -0.108017   0.123947  -0.871
+CWM_pollmode    0.238807   0.123660   1.931
+rich_sp_pl      0.022234   0.004444   5.003
+CWM_height_max  0.153113   0.058275   2.627
+
+Response: Longicornes
+                 Chisq Df Pr(>Chisq)    
+CWM_pollmode    3.7294  1   0.053464 .  
+rich_sp_pl     25.0342  1  5.632e-07 ***
+CWM_height_max  6.9033  1   0.008604 ** 
+
+R2m         R2c
+0.01536327 0.2593688
+
+## 3.13. Malachites
+
+```{r}
+mod <- lmer(Malachites~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Malachites~ rich_sp_pl+CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+            Estimate Std. Error t value
+(Intercept)  7.73094    2.26489   3.413
+rich_sp_pl   0.03382    0.02013   1.680
+CWM_EIV_N   -0.77295    0.34578  -2.235
+
+Response: Malachites
+            Chisq Df Pr(>Chisq)  
+rich_sp_pl 2.8236  1    0.09289 .
+CWM_EIV_N  4.9970  1    0.02539 *
+
+R2m           R2c
+0.003256478 0.2539803
+
+## 3.13. Mordelles
+
+```{r}
+mod <- lmer(Mordelles~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Mordelles~  rich_sp_pl + CWM_height_max + CWM_EIV_N +(1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+                Estimate Std. Error t value
+(Intercept)     1.633227   0.632165   2.584
+rich_sp_pl      0.015143   0.005579   2.714
+CWM_height_max  0.274989   0.074275   3.702
+CWM_EIV_N      -0.215196   0.095751  -2.247
+
+Response: Mordelles
+                 Chisq Df Pr(>Chisq)    
+rich_sp_pl      7.3681  1  0.0066390 ** 
+CWM_height_max 13.7070  1  0.0002137 ***
+CWM_EIV_N       5.0510  1  0.0246118 *  
+
+R2m           R2c
+0.01026488 0.2277845
+
+## 3.14. Oedémérides
+
+```{r}
+mod <- lmer(Oedemerides~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Oedemerides~ CWM_perennial + CWM_pollmode+ rich_sp_pl + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)    3.07170    0.58362   5.263
+CWM_perennial -2.19907    0.57956  -3.794
+CWM_pollmode   1.23907    0.42755   2.898
+rich_sp_pl     0.04480    0.01574   2.847
+
+Response: Oedemerides
+               Chisq Df Pr(>Chisq)    
+CWM_perennial 14.398  1   0.000148 ***
+CWM_pollmode   8.399  1   0.003754 ** 
+rich_sp_pl     8.105  1   0.004414 ** 
+
+R2m          R2c
+0.01380003 0.2012929
+
+
+
+## 3.15. Staphylins
+
+```{r}
+mod <- lmer(Staphylins~ ab_pl + rich_sp_pl + CWM_height_max + CWM_flow_on + CWM_perennial + CWM_pollmode + CWM_EIV_N+ (1| id_parcelle)  , data=plant_coleo, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Staphylins~ ab_pl + CWM_pollmode + (1| id_parcelle)  , data=plant_coleo, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+Fixed effects:
+              Estimate Std. Error t value
+(Intercept)   1.439750   0.224906   6.402
+ab_pl         0.006507   0.002233   2.914
+CWM_pollmode -0.610597   0.258155  -2.365
+
+Response: Staphylins
+              Chisq Df Pr(>Chisq)   
+ab_pl        8.4895  1   0.003572 **
+CWM_pollmode 5.5943  1   0.018019 * 
+
+R2m       R2c
+0.003338304 0.1043531

@@ -1,0 +1,21 @@
+response_variable;year_estimate;p_value;signif;R2m;R2c;dataset
+Proportion of Poaceae;0.2104;0,000;***;0.0028;0.4069;All dataset
+Proportion of Asteraceae (sqrt);0.0073;0.1108;ns;0.0003;0.4135;All dataset
+Proportion of Fabaceae (log+1);-0.0016;0.6078;ns;0,0000;0.5339;All dataset
+Proportion of Plantaginaceae (sqrt);-0.0175;0,000;***;0.0019;0.4975;All dataset
+Proportion of Convolvulaceae (log+1);-0.0085;0.002;**;0.0009;0.5201;All dataset
+Proportion of Rosaceae (log+1);0.0218;0,000;***;0.003;0.6263;All dataset
+Proportion of Geraniaceae (sqrt);0.0337;0,000;***;0.0091;0.3832;All dataset
+Proportion of Apiaceae (log+1);0.0084;0.0013;**;0.0011;0.4773;All dataset
+Proportion of Polygonaceae (log+1);-0.0104;0.0003;***;0.0016;0.3572;All dataset
+Proportion of Rubiaceae (log+1);0.0015;0.5371;ns;0,0000;0.5064;All dataset
+Poaceae richness;0.0432;0,000;***;0.0033;0.4845;All dataset
+Asteraceae richness (log+1);0.0073;0.0001;***;0.0018;0.3873;All dataset
+Fabaceae richness (log+1);0.0021;0.2047;ns;0.0001;0.5424;All dataset
+Plantaginaceae richness (log+1);-0.0077;0,000;***;0.003;0.4075;All dataset
+Convolvulaceae richness (sqrt);-0.0047;0.0027;**;0.001;0.4253;All dataset
+Rosaceae richness (sqrt);0.0108;0,000;***;0.0036;0.571;All dataset
+Geraniaceae richness (log+1);0.0112;0,000;***;0.0077;0.3504;All dataset
+Apiaceae richness (log+1);0.0043;0.0012;**;0.0012;0.4281;All dataset
+Polygonaceae richness (log+1);-0.0073;0,000;***;0.003;0.3382;All dataset
+Rubiaceae richness (sqrt);0.001;0.5513;ns;0,0000;0.4194;All dataset

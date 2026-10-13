@@ -1,0 +1,32 @@
+{
+    "id": "5187821D",
+    "path": "G:/morphogroup_coleo_analyses/2.2. glmm_agri_practices.qmd",
+    "project_path": "2.2. glmm_agri_practices.qmd",
+    "type": "quarto_markdown",
+    "hash": "831716244",
+    "contents": "",
+    "dirty": false,
+    "created": 1736494154289.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "chunk_output_type": "console",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "cursorPosition": "11,0",
+        "scrollLine": "0",
+        "rmdVisualModeLocation": "2:0",
+        "rmdVisualCollapsedChunks": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1736503084,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1736503084224,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,549 @@
+---
+title: "2.2. glmm_agri_practices"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open dataset
+
+```{r}
+library(tidyverse)
+library(FactoMineR)
+library(lubridate)
+library(factoextra)
+library(corrplot)
+library(lme4)
+library(MuMIn)
+library(MASS)
+library(AICcmodavg)
+library(car)
+library(ggpubr)
+select <- dplyr::select
+
+morpho_agri <- read.csv("2.glmm_morphogroups_practices/2.2.glmm_agri_practices/input/morphogroups_agri_practices.csv") %>% 
+  select(-X)
+```
+
+# 2. GLMM : agri practices impacts on coleo groups
+
+## 2.1. Bruches
+
+```{r}
+mod <- lmer(Bruches~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Bruches~ Bordure_Largeur + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+
+
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value 
+(Intercept) 2.96925 0.39669 7.485 
+Bordure_Largeur -0.19691 0.08963 -2.197 
+TypeCultureMaraichage 0.19646 0.78133 0.251 
+TypeCultureVigne 3.89005 0.59707 6.515
+
+Response: Bruches 
+Chisq Df Pr(\>Chisq)\
+Bordure_Largeur 4.826 1 0.02803 \*\
+TypeCulture 43.194 2 4.174e-10 \*\*\*
+
+```         
+        R2m       R2c
+```
+
+\[1,\] 0.02085553 0.1569439
+
+## 2.2. Buprestes
+
+```{r}
+mod <- lmer(Buprestes~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Buprestes~ Bordure_NombreInterventionYEAR + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 0.44057 0.08069 5.460 Bordure_NombreInterventionYEAR -0.15655 0.07012 -2.233 TypeCultureMaraichage 0.04360 0.16732 0.261 TypeCultureVigne 0.39681 0.12862 3.085
+
+Response: Buprestes Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 4.9852 1 0.025566 \* TypeCulture 9.6208 2 0.008144 \*\*
+
+## 2.2. Cantharides
+
+```{r}
+mod <- lmer(Cantharides~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Cantharides~   TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 4.9140 0.2755 17.835 TypeCultureMaraichage -1.5733 0.7642 -2.059 TypeCultureVigne -2.9169 0.5850 -4.986
+
+Response: Cantharides Chisq Df Pr(\>Chisq)\
+TypeCulture 26.371 2 1.877e-06 \*\*\*
+
+```         
+        R2m       R2c
+```
+
+\[1,\] 0.01546043 0.2324705
+
+## 2.4. Carabiques
+
+```{r}
+mod <- lmer(Carabiques~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Carabiques~ Bordure_NombreInterventionYEAR + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 1.29366 0.09835 13.154 Bordure_NombreInterventionYEAR -0.22639 0.08553 -2.647 TypeCultureMaraichage -0.37056 0.20396 -1.817 TypeCultureVigne -0.48417 0.15729 -3.078
+
+Response: Carabiques Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 7.0064 1 0.008122 **TypeCulture 11.0749 2 0.003936**
+
+```         
+         R2m       R2c
+```
+
+\[1,\] 0.008796065 0.1109977
+
+## 2.5. Charançons
+
+```{r}
+mod <- lmer(Charancons~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+```
+
+ns
+
+## 2.6. Chrysomèles
+
+```{r}
+mod <- lmer(Chrysomeles~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Chrysomeles~ CoefN + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 18.26037 1.40160 13.028 CoefN 0.03786 0.01240 3.052 TypeCultureMaraichage 2.69753 2.34249 1.152 TypeCultureVigne -4.75930 2.02299 -2.353
+
+Response: Chrysomeles Chisq Df Pr(\>Chisq)\
+CoefN 9.3177 1 0.00227 \*\* TypeCulture 8.4941 2 0.01431 \*
+
+```         
+        R2m       R2c
+```
+
+\[1,\] 0.01177065 0.1077509
+
+
+
+
+## 2.7. Coccinelles
+
+```{r}
+mod <- lmer(Coccinelles~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Coccinelles~ Bordure_Largeur + IFT_Insecticide2013_2019 + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 7.5588 0.5984 12.632 Bordure_Largeur 0.2723 0.1296 2.101 IFT_Insecticide2013_2019 -0.8327 0.4490 -1.855 TypeCultureMaraichage 1.6621 1.1440 1.453 TypeCultureVigne -2.6990 0.9017 -2.993
+
+Response: Coccinelles Chisq Df Pr(\>Chisq)\
+Bordure_Largeur 4.4159 1 0.035605 \* IFT_Insecticide2013_2019 3.4399 1 0.063638 . TypeCulture 13.4583 2 0.001196 \*\*
+
+R2m R2c 0.01325766 0.2143595
+
+## 2.8. Divers
+
+```{r}
+mod <- lmer(Divers~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Divers~ Bordure_Largeur  + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 10.4031 0.8971 11.596 Bordure_Largeur -0.5111 0.2181 -2.344
+
+Response: Divers Chisq Df Pr(\>Chisq)\
+Bordure_Largeur 5.4923 1 0.0191 \*
+
+R2m R2c 0.002155546 0.1062332
+
+## 2.9. Divers - petits coléoptères avec antennes en massues
+
+```{r}
+mod <- lmer(morpho_agri$Divers..Petits.coleopteres.avec.antennes.en.massues~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(morpho_agri$Divers..Petits.coleopteres.avec.antennes.en.massues~ IFT_Insecticide2013_2019 + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 17.141 1.492 11.485 IFT_Insecticide2013_2019 -2.791 1.514 -1.844 TypeCultureMaraichage 4.401 3.866 1.138 TypeCultureVigne -9.817 3.033 -3.237
+
+Response: morpho_agri\$Divers..Petits.coleopteres.avec.antennes.en.massues Chisq Df Pr(\>Chisq)\
+IFT_Insecticide2013_2019 3.3999 1 0.0651990 .\
+TypeCulture 13.9024 2 0.0009575 \*\*\*
+
+R2m R2c 0.007622162 0.09126325
+
+## 2.10. Elatéridés
+
+```{r}
+mod <- lmer(Elaterides~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Elaterides~ TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 3.1270 0.2184 14.318 TypeCultureMaraichage -1.5938 0.6057 -2.631 TypeCultureVigne -1.4414 0.4638 -3.108
+
+Response: Elaterides Chisq Df Pr(\>Chisq)\
+TypeCulture 14.216 2 0.0008186 \*\*\*
+
+R2m R2c 0.008357629 0.2280435
+
+## 2.11. Longicornes
+
+```{r}
+mod <- lmer(Longicornes~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Longicornes~ Bordure_NombreInterventionYEAR + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 0.67457 0.07145 9.441 Bordure_NombreInterventionYEAR -0.24901 0.06217 -4.006 TypeCultureMaraichage 0.01184 0.14848 0.080 TypeCultureVigne 0.50968 0.11503 4.431
+
+Response: Longicornes Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 16.045 1 6.186e-05 ***TypeCulture 20.211 2 4.085e-05***
+
+R2m R2c 0.01839659 0.2421129
+
+## 2.12. Malachites
+
+```{r}
+mod <- lmer(Malachites~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Malachites~ CoefN+ (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 2.715560 0.307767 8.823 CoefN 0.006750 0.003206 2.105
+
+Response: Malachites Chisq Df Pr(\>Chisq)\
+CoefN 4.4313 1 0.03528 \*
+
+## 2.12. Mordelles
+
+```{r}
+mod <- lmer(Mordelles~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Mordelles~ Bordure_NombreInterventionYEAR + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 0.88219 0.09101 9.693 Bordure_NombreInterventionYEAR -0.23029 0.07918 -2.908 TypeCultureMaraichage 0.23116 0.18920 1.222 TypeCultureVigne 0.44387 0.14664 3.027
+
+Response: Mordelles Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 8.4582 1 0.003634 **TypeCulture 9.6092 2 0.008192**
+
+R2m R2c 0.009437632 0.2535942
+
+## 2.14. Oedémérides
+
+```{r}
+mod <- lmer(Oedemerides~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Oedemerides~ Bordure_NombreInterventionYEAR + CoefN + IFT_Insecticide2013_2019 + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 3.538277 0.278543 12.703 Bordure_NombreInterventionYEAR -0.416779 0.197290 -2.113 CoefN -0.005698 0.002236 -2.548 IFT_Insecticide2013_2019 0.434430 0.181673 2.391
+
+Response: Oedemerides Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 4.4628 1 0.03464 *CoefN 6.4937 1 0.01083* IFT_Insecticide2013_2019 5.7182 1 0.01679 \*
+
+R2m R2c 0.008209666 0.2030922
+
+## 2.15. Staphylins
+
+```{r}
+mod <- lmer(Staphylins~ Bordure_Largeur + Bordure_NombreInterventionYEAR + IFT_Insecticide2013_2019 + CoefN + TypeCulture+ (1| id_parcelle)  , data=morpho_agri, REML=F, na.action="na.fail")
+vif(mod)
+dredge(mod)
+
+mod_best <- lmer(Staphylins~ Bordure_NombreInterventionYEAR + TypeCulture + (1| id_parcelle)  , data=morpho_agri, REML=T, na.action="na.fail")
+summary(mod_best)
+Anova(mod_best)
+r.squaredGLMM(mod_best)
+```
+
+Fixed effects: Estimate Std. Error t value (Intercept) 1.48417 0.11420 12.996 Bordure_NombreInterventionYEAR 0.16251 0.09929 1.637 TypeCultureMaraichage -0.41459 0.23680 -1.751 TypeCultureVigne -0.92170 0.18244 -5.052
+
+Response: Staphylins Chisq Df Pr(\>Chisq)\
+Bordure_NombreInterventionYEAR 2.6786 1 0.1017\
+TypeCulture 26.2010 2 2.044e-06 \*\*\*
+
+R2m R2c 0.009583646 0.09467101
+
+# 3. Figures
+
+## 3.1. Prepare data for figures
+```{r}
+morpho_agri_plot <- morpho_agri %>% 
+  group_by(id_parcelle,TypeCulture) %>% 
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>% 
+  select(1,2,3:18)
+```
+
+
+## 3.2. Crop type
+
+### Bruches
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Bruches,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. bruches")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Buprestes
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Buprestes,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. buprestes")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Chrysomèles
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Chrysomeles,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. chrysomèles")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Cantharides
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Cantharides,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. cantharides")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Carabiques
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Carabiques,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. carabiques")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Chrysomeles
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Chrysomeles,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. chrysomeles")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Coccinelles
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y = Coccinelles,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. coccinelles")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+
+
+### Divers..Petits.coleopteres.avec.antennes.en.massues
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y =Divers..Petits.coleopteres.avec.antennes.en.massues,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. divers petits coléo antennes en massue")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Elaterides
+```{r}
+morpho_agri_plot2 <- morpho_agri_plot %>% 
+  filter(Elaterides < 30)
+
+ggplot(data= morpho_agri_plot2) + 
+  aes(x= TypeCulture, y =Elaterides,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. elaterides")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Longicornes
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y =Longicornes,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. longicornes")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```
+
+### Mordelles
+```{r}
+ggplot(data= morpho_agri_plot) + 
+  aes(x= TypeCulture, y =Mordelles,fill=TypeCulture) +
+  geom_jitter(alpha=0.3,col="indianred1")+
+  geom_boxplot(alpha=0.8)+
+  scale_fill_manual(values=c("darkgoldenrod2","#458B00","darkorchid4"))+
+  labs(x="Crop type", y = "Ab. mordelles")+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=18))+
+  theme(legend.title = element_text(size=18),
+        legend.text = element_text(size=14))+ theme(legend.position = "none")+
+  stat_compare_means(method = "kruskal.test",
+                     label="p",
+                     vjust = -0.5)
+```

@@ -1,0 +1,16 @@
+groupe_coleoptere;morphog;morphog_pred;morphog_pest;morphog_flovis
+Bruches;Bruches;not_predator;mostly_not_pest;not_flovis
+Buprestes;Buprestes;not_predator;not_pest;not_flovis
+Cantharides;Cantharides;predat;not_pest;not_flovis
+Carabiques;Carabiques;mixed_pred;not_pest;mixed_flovis
+Charançons;Charancons;not_predator;mostly_pest;not_flovis
+Chrysomèles;Chrysomeles;not_predator;mostly_pest;not_flovis
+Coccinelles;Coccinelles;mixed_pred;not_pest;mixed_flovis
+Divers;Divers;mixed_pred;not_pest;flovis
+Divers- Petits coléoptères avec antennes en massues;Divers-_Petits_coleopteres_avec_antennes_en_massues;not_predator;mostly_pest;flovis
+Elatéridés;Elaterides;mixed_pred;mostly_not_pest;flovis
+Longicornes;Longicornes;not_predator;not_pest;not_flovis
+Malachites;Malachites;predat;not_pest;flovis
+Mordelles;Mordelles;not_predator;not_pest;flovis
+Oedémérides;Oedemerides;not_predator;not_pest;flovis
+Staphylins;Staphylins;predat;not_pest;not_flovis
