@@ -24,11 +24,10 @@ library(performance)
 select <- dplyr::select
 ```
 
-
-
 # 2. Open & first visualisations
 
 ## 2.1. Open dataset
+
 ```{r}
 coleo_tot <- read.csv("2.temporal_morphogroups/input/coleo_year.csv") %>% 
   mutate(id_parcelle=as.character(id_parcelle))
@@ -66,6 +65,7 @@ overdisp_fun <- function(model) {
 ## 2.2. Stats descriptives
 
 Abondance totale, moyenne par sample et prevalence par morphogroupe
+
 ```{r}
 coleo_long <- coleo_year %>% 
   rename("Seed_beetles" = "Bruches",
@@ -100,6 +100,7 @@ coleo_recap <- coleo_long %>%
 ```
 
 Histogramme de l'abondance de chaque morphogroupe
+
 ```{r}
 coleo_hist <-  coleo_year %>% 
   rename("Seed_beetles" = "Bruches",
@@ -283,6 +284,7 @@ ggplot(coleo_hist, aes(x = ab_tot)) +
 ```
 
 Quelle repartition des zéros par morphogroupe ?
+
 ```{r}
 coleo_z <- coleo_long %>% 
   group_by(morphog) %>% 
@@ -294,18 +296,16 @@ coleo_z <- coleo_long %>%
   distinct()
 ```
 
-
 # 3. Ab morphogroups
 
 ```{r}
 coleo_year$annee <- coleo_year$annee - mean(coleo_year$annee)
 ```
 
-
 ## 3.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches ~ annee + (1 | id_parcelle), dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Bruches ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -317,17 +317,12 @@ Anova(mod)
 r2(mod)
 ```
 
-effet pos annee 0.03 \*\*\*
-disp annee 0.047 ***
+effet pos annee 0.03 \*\*\* disp annee 0.047 \*\*\*
 
 ## 3.2. Buprestes
 
 ```{r}
 mod <- glmmTMB(Buprestes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
-
-summary(coleo_year$Elatéridés)
-var(coleo_year$Elatéridés)
-
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -338,9 +333,7 @@ summary(mod)
 Anova(mod)
 r2(mod)
 ```
-
--0.02 \*
-ns pour dispersion annee
+ns
 
 ## 3.3. Cantharides
 
@@ -354,11 +347,10 @@ testZeroInflation(sim_res) # 40% sites avec zéro
 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 
-ns
-ns dispersion
+ns ns dispersion
 
 ## 3.4. Carabiques
 
@@ -370,80 +362,16 @@ plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # 67% sites avec zéro
 
-mod2 <- glmmTMB(Carabiques ~ annee + (1| id_parcelle) ,family=nbinom2, data=coleo_year, ziformula = ~1)
-
-sim_res_zi <- simulateResiduals(mod2)
-testZeroInflation(sim_res_zi)
-AIC(mod,mod2) # zero inflated model better
-overdisp_fun(mod2)
-
-summary(mod2)
-Anova(mod2)
-r2(mod2)
+summary(mod)
+r2(mod)
 ```
--0.03 \*\*\*
-ns dispersion annee
+
+-0.03 \*\*\* ns dispersion annee
 
 ## 3.5. Charançons
 
-modèle avec effet de l'année sur la dispersion
 ```{r}
-mod_nb2 <- glmmTMB(
-  Charançons ~ annee_c + (1 | id_parcelle),
-  family = nbinom2,
-  data = coleo_year
-)
-AIC(mod,mod_nb2)
-summary(mod)
-summary(mod_nb2)
-
-mod_disp2 <- glmmTMB(
-  Charançons ~ annee + (1 | id_parcelle),
-  dispformula = ~ annee,
-  family = nbinom2,
-  data = coleo_year
-) #la variance varie aussi avec l'année, pas que la moyenne, car énorme hétérogénéité d'une année sur l'autre au sein de la même parcelle donc on peut mettre la dispersion 
-
-summary(mod_disp2)
-AIC(mod_disp,mod_disp2)
-
-res_disp <- simulateResiduals(mod_disp, n = 1000)
-
-testDispersion(res_disp)
-testZeroInflation(res_disp)
-plot(res_disp)
-
-AIC(mod_nb2, mod_disp)
-summary(mod_disp)
-coleo_disp <- coleo_year %>%
-  group_by(annee) %>%
-  summarise(
-    n = n(),
-    moyenne = mean(Charançons),
-    variance = var(Charançons),
-    mediane = median(Charançons),
-    max = max(Charançons),
-    zeros = sum(Charançons == 0)
-  )
-coleo_disp
-
-plotResiduals(res_disp, form = coleo_year$annee)
-
-plotResiduals(res_disp, form = coleo_year$id_parcelle)
-
-testTemporalAutocorrelation(
-  res_disp,
-  time = coleo_year$annee,
-  group = coleo_year$id_parcelle
-)
-
-testOutliers(res_disp, type = "bootstrap")
-```
-
-
-
-```{r}
-mod <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Charançons ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -451,12 +379,10 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) # 6% sites avec zéro
 
 summary(mod)
-Anova(mod)
 r2(mod)
 ```
 
--0.0197 \*\*\*
-0.04 *** dispersion annee
+-0.015 \*\*\* 0.04 \*\*\* dispersion annee
 
 ## 3.6. Chrysomèles
 
@@ -468,13 +394,18 @@ plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Chrysomèles ~ annee + (1| id_parcelle) , data=coleo_year,family=nbinom2, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model not better
+overdisp_fun(mod2)
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 
--0.01 \*
-ns pour dispersion annee
+-0.01 \** ns pour dispersion annee
 
 ## 3.7. Coccinelles
 
@@ -489,8 +420,8 @@ testZeroInflation(sim_res) # 18% sites avec zéro
 summary(mod)
 Anova(mod)
 ```
-ns
-ns dispersion
+
+ns ns dispersion
 
 ## 3.8. Divers
 
@@ -511,7 +442,7 @@ ns
 ## 3.9. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins ~ annee + (1 | id_parcelle),  dispformula = ~ annee,family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Staphylins ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -521,8 +452,8 @@ testZeroInflation(sim_res) # 58% sites avec zéro
 summary(mod)
 Anova(mod)
 ```
-ns
-0.0393 ** disp
+
+ns 0.0393 \*\* disp
 
 ## 3.10. Elatéridés
 
@@ -535,34 +466,30 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) # 43% sites avec zéro
 
 summary(mod)
-Anova(mod)
 ```
 
-ns
-0.0445 *** dispersion annee
+ns 0.0445 \*\*\* dispersion annee
 
 ## 3.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes ~ annee + (1 | id_parcelle),dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Longicornes ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # 78% sites avec zéro
 
-summary(modd)
-Anova(mod)
+summary(mod)
 r2(mod)
 ```
 
-0.044 \*\*\*
-0.064 ** dispersion annee
+0.054 \*\*\* 0.064 \*\* dispersion annee
 
 ## 3.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites ~ annee + (1 | id_parcelle), dispformula = ~ annee,family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Malachites ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -570,17 +497,15 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) # 42% sites avec zéro
 
 summary(mod)
-Anova(mod)
 r2(mod)
 ```
 
-0.025 \*\*\*
-0.0351 ** disp annee
+0.033 \*\*\* 0.0351 \*\* disp annee
 
 ## 3.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles ~ annee + (1 | id_parcelle),dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Mordelles ~ annee + (1 | id_parcelle),family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -588,18 +513,15 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) # 69% sites avec zéro
 
 summary(mod)
-Anova(mod)
 r2(mod)
 ```
 
-0.017 trend
-0.051 ** dispersion annee
-
+0.023 ** 0.051 \*\* dispersion annee
 
 ## 3.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides ~ annee + (1 | id_parcelle), dispformula = ~ annee,family = nbinom2, data = coleo_year)
+mod <- glmmTMB(Oedémérides ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -607,17 +529,15 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) # 38% sites avec zéro
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 
-ns
-0.033 ** disp annee
-
+0.01 *
 
 ## 3.15. Divers petits
 
 ```{r}
-mod <- glmmTMB(coleo_year$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1 | id_parcelle),dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(coleo_year$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -626,17 +546,15 @@ testZeroInflation(sim_res) # 50% sites avec zéro
 overdisp_fun(mod)
 
 summary(mod)
-Anova(mod)
 r2(mod)
 ```
 
-0.068 \*\*\*
-0.112 ***
+0.017  \*\*\* 0.112 \*\*\*
 
 ## 4.2. Abundance
 
 ```{r}
-mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),  dispformula = ~ annee, data = coleo_year,family=nbinom2)
+mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),  data = coleo_year,family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -644,11 +562,9 @@ testDispersion(sim_res)
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
 ```
 
-ns
-0.034 *** annee disp
+ns 0.034 \*\*\* annee disp
 
 # 5. Per crop type
 
@@ -1233,19 +1149,18 @@ Anova(mod)
 ## 6.1. Predators
 
 ```{r}
-modd <- glmmTMB(predat ~ annee + (1 | id_parcelle),dispformula = ~ annee,  family = nbinom2, data = coleo_year)
+mod <- glmmTMB(predat ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res)
 
-summary(modd)
-Anova(mod)
+summary(mod)
+r2(mod)
 ```
 
-0.01 *
-0.027 *** dispersion annee
+0.01 *0.027* \*\* dispersion annee
 
 ```{r}
 mod <- glmmTMB(not_predator ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
@@ -1290,18 +1205,18 @@ Anova(mod)
 ## 6.2. Pests
 
 ```{r}
-mod <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(mostly_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res)
 
-summary(modd)
-Anova(mod)
+summary(mod)
+r2(mod)
 ```
-0.01, p = 0.049 *
-0.027 *** disp annee
+
+ns *0.027* \*\* disp annee
 
 ```{r}
 mod <- glmmTMB(mostly_not_pest ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)
@@ -1346,7 +1261,7 @@ ns
 ## 6.3. Flower visitors
 
 ```{r}
-mod <- glmmTMB(flovis ~ annee + (1 | id_parcelle), dispformula = ~ annee, family = nbinom2, data = coleo_year)
+mod <- glmmTMB(flovis ~ annee + (1 | id_parcelle),  family = nbinom2, data = coleo_year)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1354,11 +1269,10 @@ testDispersion(sim_res)
 testZeroInflation(sim_res)
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 
-0.02 ***
-0.044 *** disp annee
+0.02 ***0.044*** disp annee
 
 ```{r}
 mod <- glmmTMB(not_flovis ~ annee + (1 | id_parcelle), family = nbinom2, data = coleo_year)

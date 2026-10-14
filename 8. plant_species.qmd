@@ -13,6 +13,7 @@ select <- dplyr::select
 library(tidyverse)
 library(lattice)
 library(lme4)
+library(performance)
 library(lubridate)
 library(DHARMa)
 library(glmmTMB)
@@ -34,6 +35,7 @@ crop <- read.csv(file="8.plant_species/input/region_and_crop_type.csv",sep=";")%
 
 plants_tot <- read.csv(file="8.plant_species/input/flore_long2025.csv",sep=";") %>% 
   mutate(id_parcelle=as.factor(id_parcelle)) %>% 
+  filter(annee>2012) |> 
   left_join(crop) 
 
 plots_plus_sept <- plants_tot %>% 
@@ -46,10 +48,13 @@ plots_plus_sept <- plants_tot %>%
   filter(nbre_annee > 7)
 
 plants_sp_year <- plants_tot %>% 
-  filter(id_parcelle %in% plots_plus_sept$id_parcelle) 
+  filter(id_parcelle %in% plots_plus_sept$id_parcelle) |> 
+    mutate(
+    ab_pl = if_else(ab_pl > 10, 10,ab_pl))
 ```
 
 # 2. Select most abundant species
+
 ## 2.1. 30 most abundant 2013
 
 ```{r}
@@ -57,8 +62,7 @@ ab_2013 <- plants_sp_year %>%
   filter(annee==2013) %>% 
   group_by(nom.eni) %>% 
   summarise(ab_sp = sum(ab_pl)) %>% 
-  filter(ab_sp >284) %>% 
-  select(nom.eni)
+  slice_max(order_by = ab_sp, n = 30, with_ties = FALSE) 
 ```
 
 ## 2.2. 30 most abundant 2024
@@ -68,60 +72,62 @@ ab_2024 <- plants_sp_year %>%
  filter(annee==2024) %>% 
   group_by(nom.eni) %>% 
   summarise(ab_sp = sum(ab_pl))%>% 
-  filter(ab_sp >170) %>% 
-  select(nom.eni)
+  slice_max(order_by = ab_sp, n = 30, with_ties = FALSE) 
 ```
 
 ## 2.3. Final list
 
 ```{r}
 list_sp <- ab_2024 %>% 
-  rbind(ab_2013) %>% 
+  rbind(ab_2013) |> 
+  select(nom.eni)%>% 
   distinct() %>%
     mutate(across(
     everything(),
     ~ str_replace_all(.x, " ", "_") %>%
       str_replace_all("\\.", "")
-  ))
+  )) 
+print(list_sp,n=35)
 ```
- 
- 1 Achillea_millefolium               
- 2 Agrostis_stolonifera               
- 3 Arrhenatherum_elatius_subsp_elatius
- 4 Avena_sativa_gpe                   
- 5 Bromus_hordeaceus                  
- 6 Bromus_sterilis                    
- 7 Cirsium_arvense                    
- 8 Convolvulus_arvensis               
- 9 Dactylis_glomerata                 
-10 Daucus_carota                      
-11 Elytrigia_repens                   
-12 Galium_aparine_subsp_aparine       
-13 Galium_mollugo_gpe                 
-14 Geranium_dissectum                 
-15 Holcus_lanatus                     
-16 Lolium_perenne                     
-17 Matricaria_chamomilla              
-18 Plantago_lanceolata                
-19 Plantago_major                     
-20 Poa_annua                          
-21 Poa_pratensis                      
-22 Poa_trivialis                      
-23 Potentilla_reptans                 
-24 Rubus                              
-25 Schedonorus_arundinaceus_gpe       
-26 Taraxacum_section_Ruderalia        
-27 Trifolium_repens                   
-28 Urtica_dioica                      
-29 Veronica_persica                   
-30 Vicia_sativa                       
-31 Calystegia_sepium                  
-32 Polygonum_aviculare                
-33 Ranunculus_repens                  
-34 Rumex_crispus                      
-35 Sonchus_asper       
+
+ 1 Lolium_perenne                      1266 
+ 2 Dactylis_glomerata                  986  
+ 3 Convolvulus_arvensis                948  
+ 4 Geranium_dissectum                  805  
+ 5 Plantago_lanceolata                 789  
+ 6 Arrhenatherum_elatius_subsp_elatius 615  
+ 7 Bromus_hordeaceus                   584  
+ 8 Poa_trivialis                       583  
+ 9 Potentilla_reptans                  559  
+10 Elytrigia_repens                    493  
+11 Bromus_sterilis                     410  
+12 Trifolium_repens                    403  
+13 Poa_annua                           389  
+14 Poa_pratensis                       385  
+15 Taraxacum_section_Ruderalia         364  
+16 Galium_aparine_subsp_aparine        327  
+17 Cirsium_arvense                     323  
+18 Schedonorus_arundinaceus_gpe        306  
+19 Rubus                               305  
+20 Vicia_sativa                        299  
+21 Daucus_carota                       290  
+22 Urtica_dioica                       266  
+23 Avena_sativa_gpe                    228  
+24 Holcus_lanatus                      226  
+25 Plantago_major                      213  
+26 Achillea_millefolium                194  
+27 Galium_mollugo_gpe                  183  
+28 Agrostis_stolonifera                176  
+29 Matricaria_chamomilla               173  
+30 Veronica_persica                    171  
+31 Lolium_perenne                      1790 
+32 Convolvulus_arvensis                1445 
+33 Dactylis_glomerata                  1223 
+34 Plantago_lanceolata                 1011 
+35 Trifolium_repens                    906 
 
 # 3. Dynamic of abundance of each species
+
 ```{r}
 plants_sp_year_wide <- plants_sp_year %>%
   mutate(
@@ -130,43 +136,181 @@ plants_sp_year_wide <- plants_sp_year %>%
   ) %>% 
   pivot_wider(names_from = nom.eni,
               values_from = ab_pl,
-              values_fill= 0)
+              values_fill= 0) |> 
+   mutate(annee = annee - 2013) #centrer année
 ```
 
 ## 3.1.Arrhenatherum_elatius_subsp_elatius
+
 ```{r}
-mod <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+mod <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
-testDispersion(sim_res)
-testZeroInflation(sim_res) # ok
+testDispersion(sim_res) # dispersion en dessous de 1, sous-disp
+overdisp_fun(mod) #still under 1, so still kind of ok
+testZeroInflation(sim_res) # not ok
 
-overdisp_fun(mod) #still under 1
+y <- plants_sp_year_wide$Arrhenatherum_elatius_subsp_elatius
+c(
+  zeros_observes = sum(y == 0),
+  proportion_zeros = mean(y == 0),
+  total_observations = length(y)
+)
+
+# Nombre de zéros attendu sous le modèle ajusté vs ce qu'on trouve
+sim <- simulate(mod, nsim = 1000)
+zeros_simules <- vapply(
+  sim,
+  function(x) sum(x == 0),
+  numeric(1)
+)
+
+c(
+  zeros_observes = sum(y == 0),
+  zeros_simules_moyenne = mean(zeros_simules),
+  zeros_simules_min = min(zeros_simules),
+  zeros_simules_max = max(zeros_simules)
+)
+
+
+mod_zi <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom1, ziformula = ~1)
+#ne converge pas
+
+diag_parcelle <- plants_sp_year_wide %>%
+  group_by(id_parcelle) %>%
+  summarise(
+    n_obs = n(),
+    n_zeros = sum(
+      Arrhenatherum_elatius_subsp_elatius == 0,
+      na.rm = TRUE
+    ),
+    toujours_zero = all(
+      Arrhenatherum_elatius_subsp_elatius == 0,
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  )
+table(diag_parcelle$n_obs)
+table(diag_parcelle$toujours_zero)
+sum(diag_parcelle$toujours_zero)
+
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+```
+
+On a un souci de sous-dispersion, que signifie la sous-dispersion ?
+Une statistique DHARMa inférieure à 1 indique que les résidus sont moins dispersés que prévu par les simulations du modèle. Cela peut notamment provenir :
+- d'une structure temporelle ou spatiale non prise en compte ;
+- d'une structure de comptage différente de celle supposée ;
+- d'une hétérogénéité des données que le modèle représente mal.
+
+Le modèle avec inflation de zéro ne converge pas quand on met un effet aléatoire.
+Cela est du au fait que certaines parcelles sont toujours à zéro pour cette espèce : je vais donc éliminer les parcelles desquelles cette espèce est constamment absente. 
+
+```{r}
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+  
+  
+mod_no_zero <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res) # dispersion en dessous de 1, sous-disp
+overdisp_fun(mod) #still under 1, so still kind of ok
+testZeroInflation(sim_res) # not ok
+
+mod_zi <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge toujours pas
 
 summary(mod)
-Anova(mod)
+summary(mod_no_zero) 
+AIC(mod)
+AIC(mod_no_zero)
+r2(mod)
+r2(mod_no_zero)
 ```
-0.036 \*\*\*
+En fait les résultats sont similaires entre le modèle avec et sans les parcelles toujours à zéro, le modèle ne doit déjà pas les prendre en compte. Le R2 augmente en revanche, car du bruit a été supprimé ? 
+
+Je garde le modèle sans zéro enflé + sans les plots à 0 tous les ans et avec loi binomiale 1 car variance augmente avec la moyenne
+```{r}
+mod <- glmmTMB(Arrhenatherum_elatius_subsp_elatius ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
+
+summary(mod)
+r2(mod)
+```
+0.039 ***
+R2c : 0.858
+r2m : 0.005
+
 
 ## 3.2. Bromus_hordeaceus
+
 ```{r}
-mod <- glmmTMB(Bromus_hordeaceus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Bromus_hordeaceus == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Bromus_hordeaceus == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+```{r}
+mod <- glmmTMB(Bromus_hordeaceus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 overdisp_fun(mod) #still under 1
-testZeroInflation(sim_res) # ok
+testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+0.084 ***
+R2c 0.604
+R2m 0.055
 
 ## 3.3. Bromus_sterilis
+
 ```{r}
-mod <- glmmTMB(Bromus_sterilis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Bromus_sterilis == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Bromus_sterilis == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+```{r}
+mod <- glmmTMB(Bromus_sterilis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -175,13 +319,38 @@ overdisp_fun(mod) #still under 1
 testZeroInflation(sim_res) # ok
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+0.032 ***
+r2c : 0.535
+r2m : 0.009
 
 ## 3.4. Cirsium_arvense
+
 ```{r}
-mod <- glmmTMB(Cirsium_arvense ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Cirsium_arvense == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Cirsium_arvense == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+```{r}
+mod <- glmmTMB(Cirsium_arvense ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -190,33 +359,75 @@ overdisp_fun(mod) #still under 1
 testZeroInflation(sim_res) # ok
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 ns
 
 ## 3.5. Convolvulus_arvensis
 ```{r}
-mod <- glmmTMB(Convolvulus_arvensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Convolvulus_arvensis == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Convolvulus_arvensis == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
 
-sim_res <- simulateResiduals(mod, n = 1000)
+
+```{r}
+mod1 <- glmmTMB(Convolvulus_arvensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom1)
+
+sim_res <- simulateResiduals(mod1, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 overdisp_fun(mod) #under 1
-testZeroInflation(sim_res) # ok
+testZeroInflation(sim_res) 
+#diagnostics pas top mais mieux qu'en gaussien ou nb2
 
-
-mod2 <- glmmTMB(Convolvulus_arvensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1) #ne converge pas donc ok de garder sans zi
-mean(plants_sp_year_wide$Convolvulus_arvensis == 0) # 41% de zero = assez élevé mais quand même ok pour ne pas justifier de zi
-length(unique(plants_sp_year_wide$id_parcelle)) # ok
-
-summary(mod)
-Anova(mod)
+summary(mod) #ns 
+r2(mod)
 ```
 ns
 
 ## 3.6. Dactylis_glomerata
 ```{r}
-mod <- glmmTMB(Dactylis_glomerata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Dactylis_glomerata == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Dactylis_glomerata == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Dactylis_glomerata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -225,21 +436,49 @@ overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) # ok
 
 
-mod2 <- glmmTMB(Dactylis_glomerata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Dactylis_glomerata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) #zi mod better
 overdisp_fun(mod2) #ok
 
+
 summary(mod2)
-Anova(mod2)
+r2(mod2)
 ```
-0.0004 trend
+0.013 ***
+
+r2c 0.768
+r2m 0.002
 
 ## 3.7. Elytrigia_repens
 ```{r}
-mod <- glmmTMB(Elytrigia_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Elytrigia_repens == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Elytrigia_repens == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Elytrigia_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -247,51 +486,144 @@ testDispersion(sim_res)
 overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-mod2 <- glmmTMB(Elytrigia_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Elytrigia_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+
 AIC(mod,mod2) #zi mod better
-overdisp_fun(mod2) #ok
 
 summary(mod2)
-Anova(mod2)
+r2(mod2)
 ```
-ns
+-0.009 trend
+
+r2c 0.441
+r2m 0.003
 
 ## 3.8. Galium_aparine_subsp_aparine
 ```{r}
-mod <- glmmTMB(Galium_aparine_subsp_aparine ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Galium_aparine_subsp_aparine == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Galium_aparine_subsp_aparine == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Galium_aparine_subsp_aparine ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
+testZeroInflation(sim_res) 
 overdisp_fun(mod) #under 1
-testZeroInflation(sim_res) # ok
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Galium_aparine_subsp_aparine ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+
+AIC(mod,mod2) #zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.018 *
+r2c 0.655
+r2m 0.002
 
 ## 3.9. Geranium_dissectum
 ```{r}
-mod <- glmmTMB(Geranium_dissectum ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Geranium_dissectum == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Geranium_dissectum == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Geranium_dissectum ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
+testZeroInflation(sim_res)
 overdisp_fun(mod) #under 1
-testZeroInflation(sim_res) # ok
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Geranium_dissectum ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+
+AIC(mod,mod2) #zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+0.055 ***
+r2c 0.678
+r2m 0.029
 
 ## 3.10. Lolium_perenne
 ```{r}
-mod <- glmmTMB(Lolium_perenne ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Lolium_perenne == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Lolium_perenne == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Lolium_perenne ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -299,24 +631,43 @@ testDispersion(sim_res)
 overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-mod2 <- glmmTMB(Lolium_perenne ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Lolium_perenne ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) #zi mod better
-overdisp_fun(mod2) #ok
 
 summary(mod2)
-Anova(mod2)
-
-summary(mod)
-Anova(mod)
 ```
 ns
 
 ## 3.11. Plantago_lanceolata
 ```{r}
-mod <- glmmTMB(Plantago_lanceolata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Plantago_lanceolata == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Plantago_lanceolata == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Plantago_lanceolata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -324,21 +675,44 @@ testDispersion(sim_res)
 overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-mod2 <- glmmTMB(Plantago_lanceolata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Plantago_lanceolata ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
-AIC(mod,mod2) #zi mod better
+testDispersion(sim_res_zi)
 overdisp_fun(mod2) #ok
+AIC(mod,mod2) #zi mod better
 
 summary(mod2)
-Anova(mod2)
 ```
 ns
 
 ## 3.12. Poa_annua
 ```{r}
-mod <- glmmTMB(Poa_annua ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Poa_annua == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Poa_annua == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Poa_annua ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -346,311 +720,886 @@ testDispersion(sim_res)
 overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Poa_annua ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.022 **
+
+r2c 0.603
+r2m 0.01
 
 ## 3.13. Poa_pratensis
 ```{r}
-mod <- glmmTMB(Poa_pratensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Poa_pratensis == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Poa_pratensis == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Poa_pratensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Poa_pratensis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.015 **
+
+r2c 0.496
+r2m 0.007
 
 ## 3.14. Poa_trivialis
 ```{r}
-mod <- glmmTMB(Poa_trivialis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Poa_trivialis == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Poa_trivialis == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Poa_trivialis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Poa_trivialis ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.023 ***
+
+r2c 0.539
+r2m 0.015
 
 ## 3.15. Potentilla_reptans
 ```{r}
-mod <- glmmTMB(Potentilla_reptans ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Potentilla_reptans == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Potentilla_reptans == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Potentilla_reptans ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Potentilla_reptans ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) #modèle ne converge pas
+
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+0.013 *
+
+r2c 0.731
+r2m 0.001
 
 ## 3.16. Rubus
 ```{r}
-mod <- glmmTMB(Rubus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Rubus == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Rubus == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Rubus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Rubus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) 
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi better
+
+summary(mod2)
+r2(mod2)
 ```
-0.033 ***
+
+0.022 \*\*\*
+
+r2c 0.775
+r2m 0.003
 
 ## 3.17. Schedonorus_arundinaceus_gpe
 ```{r}
-mod <- glmmTMB(Schedonorus_arundinaceus_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Schedonorus_arundinaceus_gpe == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Schedonorus_arundinaceus_gpe == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Schedonorus_arundinaceus_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Schedonorus_arundinaceus_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) #modèle ne converge pas
+
+
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+0.052 ***
+
+r2c 0.711
+r2m 0.016
 
 ## 3.18. Taraxacum_section_Ruderalia
 ```{r}
-mod <- glmmTMB(Taraxacum_section_Ruderalia ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Taraxacum_section_Ruderalia == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Taraxacum_section_Ruderalia == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Taraxacum_section_Ruderalia ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-mod2 <- glmmTMB(Taraxacum_section_Ruderalia ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Taraxacum_section_Ruderalia ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
-AIC(mod,mod2) #normal mod better
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
 
-summary(mod)
-Anova(mod)
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.029 ***
+
+r2c 0.708
+r2m 0.006
 
 ## 3.19. Trifolium_repens
 ```{r}
-mod <- glmmTMB(Trifolium_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Trifolium_repens == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Trifolium_repens == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Trifolium_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-mod2 <- glmmTMB(Trifolium_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Trifolium_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
 
-sim_res_zi <- simulateResiduals(mod2)
-testZeroInflation(sim_res_zi)
-AIC(mod,mod2) #zi mod slightly better
-
-summary(mod2)
-Anova(mod2)
+summary(mod)
+r2(mod)
 ```
-ns
+-0.05 ***
+
+r2c 0.668
+r2m 0.017
 
 ## 3.20. Vicia_sativa
 ```{r}
-mod <- glmmTMB(Vicia_sativa ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Vicia_sativa == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Vicia_sativa == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Vicia_sativa ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Vicia_sativa ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
+
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+0.027 ***
+
+r2c 0.546
+r2m 0.006
 
 ## 3.21. Daucus_carota
 ```{r}
-mod <- glmmTMB(Daucus_carota ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Daucus_carota == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Daucus_carota == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Daucus_carota ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Daucus_carota ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
+
 summary(mod)
-Anova(mod)
 ```
 ns
 
 ## 3.22. Holcus_lanatus
 ```{r}
-mod <- glmmTMB(Holcus_lanatus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Holcus_lanatus == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Holcus_lanatus == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Holcus_lanatus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Holcus_lanatus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.027 **
+
+r2c 0.767
+r2m 0.005
 
 ## 3.23. Plantago_major
 ```{r}
-mod <- glmmTMB(Plantago_major ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Plantago_major == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Plantago_major == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Plantago_major ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Plantago_major ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) 
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+-0.06 ***
+
+r2c 0.611
+r2m 0.03
 
 ## 3.24. Veronica_persica
 ```{r}
-mod <- glmmTMB(Veronica_persica ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Veronica_persica == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Veronica_persica == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Veronica_persica ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
- 
+-0.04 ***
+
+r2c 0.355
+r2m 0.017
+
 ## 3.25. Achillea_millefolium
 ```{r}
-mod <- glmmTMB(Achillea_millefolium ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Achillea_millefolium == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Achillea_millefolium == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Achillea_millefolium ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Achillea_millefolium ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) 
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+0.016 trend
+
+r2c 0.714
+r2m 0.002
 
 ## 3.26. Agrostis_stolonifera
 ```{r}
-mod <- glmmTMB(Agrostis_stolonifera ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Agrostis_stolonifera == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Agrostis_stolonifera == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Agrostis_stolonifera ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Agrostis_stolonifera ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) 
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
 ns
 
 ## 3.27. Avena_sativa_gpe
 ```{r}
-mod <- glmmTMB(Avena_sativa_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
-
-sim_res <- simulateResiduals(mod, n = 1000)
-plot(sim_res)
-testDispersion(sim_res)
-overdisp_fun(mod) #under 1
-testZeroInflation(sim_res) 
-
-summary(mod)
-Anova(mod)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Avena_sativa_gpe == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Avena_sativa_gpe == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
 ```
-ns
 
-## 3.28.  Galium_mollugo_gpe
+
 ```{r}
-mod <- glmmTMB(Galium_mollugo_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+mod <- glmmTMB(Avena_sativa_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Avena_sativa_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
+r2(mod2)
 ```
-ns
+0.05 ***
+
+r2c 0.6
+r2m 0.022
+
+
+## 3.28. Galium_mollugo_gpe
+```{r}
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Galium_mollugo_gpe == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Galium_mollugo_gpe == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Galium_mollugo_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+mod2 <- glmmTMB(Galium_mollugo_gpe ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
+
+summary(mod)
+r2(mod)
+```
+0.07 ***
+
+r2c 0.692
+r2m 0.03
+
 
 ## 3.29. Matricaria_chamomilla
 ```{r}
-mod <- glmmTMB(Matricaria_chamomilla ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Matricaria_chamomilla == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Matricaria_chamomilla == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Matricaria_chamomilla ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Matricaria_chamomilla ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
 ```
 ns
 
 ## 3.30. Urtica_dioica
 ```{r}
-mod <- glmmTMB(Urtica_dioica ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Urtica_dioica == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Urtica_dioica == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Urtica_dioica ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
-summary(mod)
-Anova(mod)
+mod2 <- glmmTMB(Urtica_dioica ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) #mod zi mod better
+
+summary(mod2)
 ```
-ns 
+
+ns
 
 ## 3.31. Calystegia_sepium
 ```{r}
-mod <- glmmTMB(Calystegia_sepium ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Calystegia_sepium == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Calystegia_sepium == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Calystegia_sepium ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+-0.06 ***
+
+r2c 0.456
+r2m 0.033
 
 ## 3.32 Polygonum_aviculare
 ```{r}
-mod <- glmmTMB(Polygonum_aviculare ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Polygonum_aviculare == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Polygonum_aviculare == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Polygonum_aviculare ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -659,51 +1608,131 @@ overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+-0.03 ***
+
+r2c 0.354
+r2m 0.013
 
 ## 3.33 Ranunculus_repens
 ```{r}
-mod <- glmmTMB(Ranunculus_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Ranunculus_repens == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Ranunculus_repens == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Ranunculus_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
+mod2 <- glmmTMB(Ranunculus_repens ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1, ziformula = ~1) # ne converge pas
+
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+-0.05 ***
+
+r2c 0.558
+r2m 0.019
 
 ## 3.34 Rumex_crispus
 ```{r}
-mod <- glmmTMB(Rumex_crispus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Rumex_crispus == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Rumex_crispus == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Rumex_crispus ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+-0.059 ***
+
+r2c 0.436
+r2m 0.022
 
 ## 3.35 Sonchus_asper
 ```{r}
-mod <- glmmTMB(Sonchus_asper ~ annee + (1| id_parcelle) , data=plants_sp_year_wide,family=nbinom2)
+diag_parcelle <- plants_sp_year_wide %>%
+     group_by(id_parcelle) %>%
+     summarise(
+         n_obs = n(),
+         n_zeros = sum(
+             Sonchus_asper == 0,
+             na.rm = TRUE
+         ),
+         toujours_zero = all(
+             Sonchus_asper == 0,
+             na.rm = TRUE
+         ),
+         .groups = "drop"
+     )
+not_zero <- diag_parcelle |> 
+  filter(toujours_zero == FALSE) |> 
+  select(id_parcelle)
+plants_sp_year_wide_mod <- plants_sp_year_wide |> 
+  filter(id_parcelle %in% not_zero$id_parcelle)
+```
+
+
+```{r}
+mod <- glmmTMB(Sonchus_asper ~ annee + (1| id_parcelle) , data=plants_sp_year_wide_mod,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-overdisp_fun(mod) #under 1
 testZeroInflation(sim_res) 
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
-ns
+-0.047 ***
+
+r2c 0.251
+r2m 0.018

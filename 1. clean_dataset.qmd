@@ -66,14 +66,10 @@ samp_souci <- nb_samp_deux %>%
   rbind(nb_samp_quatre) %>% 
   distinct()
 ```
-4738 / 5568 samples avec 3 (86% des échantillons)
-656 avec 2
-164 avec 1
-10 avec 4
+
+4738 / 5568 samples avec 3 (86% des échantillons) 656 avec 2 164 avec 1 10 avec 4
 
 386 sur les 572 sont concernées avec une année à 1 ou 2 ou 4, donc pas problème récurrent sur la même parcelle année après année
-
-
 
 ## 2.2. Morphogroup per year
 
@@ -223,8 +219,8 @@ fam_flo_rich <- flore %>%
   summarise(rich_fam=sum(occ))
 ```
 
+### Most common species in each family
 
-Most common species in each family
 ```{r}
 ab_sp_per_fam <- flore %>% 
   left_join(famille) %>% 
@@ -240,7 +236,6 @@ ab_sp_per_fam <- flore %>%
   
 write.csv(ab_sp_per_fam,file="1.clean_dataset/output/dix_sp_plus_ab_par_famille_plantes.csv")
 ```
-
 
 ## 3.3. Turn wide
 

@@ -57,55 +57,7 @@ plants_year <- plants_tot %>%
 plants_year$year <- plants_year$year - mean(plants_year$year)
 ```
 
-
 ## 2.1. Poaceae
-
-```{r}
-
-
-mod_nb1 <- glmmTMB(
-  Poaceae ~ year + (1 | id_parcelle),
-  data = plants_year,
-  family = nbinom1
-)
-mod_nb2 <- glmmTMB(
-  Poaceae ~ year + (1 | id_parcelle),
-  data = plants_year,
-  family = nbinom2
-)
-
-AIC(mod_nb1,mod_nb2)
-
-res_nb1 <- simulateResiduals(mod_nb1, n = 1000)
-testDispersion(res_nb1)
-testZeroInflation(res_nb1)
-plot(res_nb1)
-
-res_nb2 <- simulateResiduals(mod_nb2, n = 1000)
-testDispersion(res_nb2)
-testZeroInflation(res_nb2)
-plot(res_nb2)
-
-sum(plants_year$Poaceae == 0, na.rm = TRUE)
-mean(plants_year$Poaceae == 0, na.rm = TRUE)
-
-summary(plants_year$Poaceae)
-
-mean(predict(mod_nb1, type = "response"))
-
-sim <- simulateResiduals(mod_nb1, n = 1000)
-
-sum(plants_year$Poaceae == 0)
-
-mean(
-  apply(sim$simulatedResponse, 2, function(x) sum(x == 0))
-)
-
-
-predict(mod,plants_year[plants_year$Poaceae==0,],type="response")
-
-```
-
 
 ```{r}
 mod <- glmmTMB(Poaceae ~ year + (1| id_parcelle) ,  data=plants_year,family=nbinom1)
@@ -177,7 +129,8 @@ summary(mod2)
 Anova(mod2)
 r2(mod2)
 ```
--0.01 *
+
+-0.01 \*
 
 ## 2.4. Plantaginaceae
 
@@ -221,13 +174,13 @@ mod2 <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year,fami
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-
 overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
 r2(mod)
 ```
+
 -0.009 \*\*\*
 
 ## 2.6. Rosaceae
@@ -272,7 +225,6 @@ mod2 <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year,family=
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-
 overdisp_fun(mod2)
 
 summary(mod2)
@@ -280,7 +232,7 @@ Anova(mod2)
 r2(mod)
 ```
 
-0.02 \*\*\*
+0.03 \*\*\*
 
 ## 2.8. Apiaceae
 
@@ -326,7 +278,6 @@ AIC(mod,mod2) # zero inflated model better
 overdisp_fun(mod2)
 
 summary(mod2)
-Anova(mod2)
 r2(mod2)
 ```
 
@@ -351,7 +302,6 @@ AIC(mod,mod2) # zero inflated model better
 overdisp_fun(mod2)
 
 summary(mod2)
-Anova(mod2)
 ```
 
 ns
@@ -359,8 +309,7 @@ ns
 ## 2.11. Richness
 
 ```{r}
-mod <- glmmTMB(richness  ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
-
+mod <- glmmTMB(richness  ~ year + (1| id_parcelle) , data=plants_year,  family = nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -369,9 +318,11 @@ testZeroInflation(sim_res)
 
 summary(mod)
 r2(mod)
+r2_res <- performance::r2(mod)
+print(r2_res, digits = 4)
 ```
 
-0.005 \*\*\*
+0.0065 \*\*\*
 
 ## 2.12. Abundance
 
@@ -387,7 +338,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.003 \*
+0.004 \**
 
 # 3. Per crop type
 

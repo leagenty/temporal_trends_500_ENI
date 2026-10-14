@@ -1,0 +1,32 @@
+{
+    "id": "A619FFE5",
+    "path": "~/GitHub/temporal_trends_500_ENI/8. plant_species.qmd",
+    "project_path": "8. plant_species.qmd",
+    "type": "quarto_markdown",
+    "hash": "38182471",
+    "contents": "",
+    "dirty": false,
+    "created": 1791965020280.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "rmdVisualMode": "false",
+        "rmdVisualWrapConfigured": "true",
+        "chunk_output_type": "console",
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "cursorPosition": "1737,9",
+        "scrollLine": "1712",
+        "rmdVisualModeLocation": "2:0",
+        "rmdVisualCollapsedChunks": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1791989381,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1791989381061,
+    "read_only": false,
+    "read_only_alternatives": []
+}
