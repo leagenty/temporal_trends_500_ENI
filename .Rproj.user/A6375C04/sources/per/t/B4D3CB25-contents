@@ -387,19 +387,13 @@ r2(mod)
 ## 3.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles ~ annee + (1 | id_parcelle), family=nbinom2,data = coleo_year)
+mod <- glmmTMB(Chrysomèles ~ year + (1 | id_parcelle), data = coleo_year,family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
-testZeroInflation(sim_res) 
+testZeroInflation(sim_res)
 
-mod2 <- glmmTMB(Chrysomèles ~ annee + (1| id_parcelle) , data=coleo_year,family=nbinom2, ziformula = ~1)
-
-sim_res_zi <- simulateResiduals(mod2)
-testZeroInflation(sim_res_zi)
-AIC(mod,mod2) # zero inflated model not better
-overdisp_fun(mod2)
 
 summary(mod)
 r2(mod)

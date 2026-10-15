@@ -264,13 +264,17 @@ clust2 <- clust %>%
 plants_year <- read.csv("7.clusters_intensity_practices/input/plants_year.csv") %>% 
   mutate(id_parcelle=as.character(id_parcelle)) %>% 
   select(-X) %>% 
-  left_join(clust)
+  left_join(clust) 
+  
 
 coleo_year <- read.csv("7.clusters_intensity_practices/input/coleo_year.csv") %>% 
   select(-X,-X.1) %>% 
   mutate(year=annee) %>% 
   mutate(id_parcelle=as.character(id_parcelle)) %>% 
   left_join(clust)
+
+plants_year$year <- plants_year$year - mean(plants_year$year)
+coleo_year$year <- coleo_year$year - mean(coleo_year$year)
 
 ```
 
@@ -287,7 +291,7 @@ testDispersion(sim_res)
 testZeroInflation(sim_res)
 
 summary(mod)
-Anova(mod)
+r2(mod)
 ```
 
 just year
@@ -598,7 +602,6 @@ sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res)
-overdisp_fun(mod)
 
 summary(mod)
 Anova(mod)
@@ -733,19 +736,20 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
 ### 5.2.1. Poaceae
 
 ```{r}
-mod <- glmmTMB(Poaceae ~ year * clust +  (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Poaceae ~ year * clust +  (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Poaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Poaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+
 AIC(mod,mod2) # zero inflated model better
-overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
@@ -785,19 +789,19 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
 ### 5.2.2. Asteraceae
 
 ```{r}
-mod <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Asteraceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
@@ -808,20 +812,19 @@ clust \*
 ### 5.2.3. Fabaceae
 
 ```{r}
-mod <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Fabaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-
-overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
@@ -832,19 +835,20 @@ year *clust*
 ### 5.2.4. Plantaginaceae
 
 ```{r}
-mod <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Plantaginaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-overdisp_fun(mod2)
+
 
 summary(mod2)
 Anova(mod2)
@@ -884,20 +888,20 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
 ### 5.2.5. Convolvulaceae
 
 ```{r}
-mod <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Convolvulaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
 
-overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
@@ -910,7 +914,7 @@ interaction \* : effet pos dans cluster 2
 ### fig
 
 ```{r}
-pred <- ggpredict(mod, terms = c("year", "clust"),bias_correction = TRUE)
+pred <- ggpredict(mod2, terms = c("year", "clust"),bias_correction = TRUE)
 
 ggplot(pred, aes(x = x, y = predicted, colour = group)) +
    scale_color_manual(values=c("orange3","maroon4"))+
@@ -937,17 +941,21 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
 ### 5.2.6. Rosaceae
 
 ```{r}
-mod <- glmmTMB(Rosaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Rosaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) 
 
-overdisp_fun(mod)
+mod2 <- glmmTMB(Rosaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
-summary(mod)
-Anova(mod)
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+summary(mod2)
 ```
 
 ns
@@ -955,20 +963,19 @@ ns
 ### 5.2.7. Geraniaceae
 
 ```{r}
-mod <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) # too much zero
 
-mod2 <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2, ziformula = ~1)
+mod2 <- glmmTMB(Geraniaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
 sim_res_zi <- simulateResiduals(mod2)
 testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
 AIC(mod,mod2) # zero inflated model better
-
-overdisp_fun(mod2)
 
 summary(mod2)
 Anova(mod2)
@@ -979,13 +986,19 @@ ns
 ### 5.2.8. Apiaceae
 
 ```{r}
-mod <- glmmTMB(Apiaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Apiaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) 
-overdisp_fun(mod)
+
+mod2 <- glmmTMB(Apiaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) # model zi not better
 
 summary(mod)
 Anova(mod)
@@ -996,43 +1009,52 @@ ns
 ### 5.2.9. Polygonaceae
 
 ```{r}
-mod <- glmmTMB(Polygonaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Polygonaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) 
 
-overdisp_fun(mod)
+mod2 <- glmmTMB(Polygonaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
-summary(mod)
-Anova(mod)
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) # model zi better
+
+
+summary(mod2)
 ```
 
-clust \*
+clust trend
 
 ### 5.2.10. Rubiaceae
 
 ```{r}
-mod <- glmmTMB(Rubiaceae  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(Rubiaceae  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
 testDispersion(sim_res)
 testZeroInflation(sim_res) 
 
-overdisp_fun(mod)
+mod2 <- glmmTMB(Rubiaceae ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
 
-summary(mod)
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+testDispersion(sim_res_zi)
+AIC(mod,mod2) # model zi better
+
+summary(mod2)
 Anova(mod)
 ```
-
-ns
+clst *
 
 ### 5.2.11. Richness
 
 ```{r}
-mod <- glmmTMB(richness  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(richness  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1077,7 +1099,7 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
 ### 5.2.12. Abundance
 
 ```{r}
-mod <- glmmTMB(abundance  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom2)
+mod <- glmmTMB(abundance  ~ year * clust + (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
