@@ -52,9 +52,7 @@ coleo_month_wide <- coleo_m %>%
   filter(annee>2012&annee<2025)
 ```
 
-
 ## 2.2. Morphogroup per year
-
 
 ```{r}
 coleo_year <- coleo_month_wide %>% 
@@ -200,7 +198,6 @@ write.csv(nb_samp_trois,"1.clean_dataset/output/nb_samples_trois.csv")
 4738 / 5568 samples avec 3 (86% des échantillons) 656 avec 2 164 avec 1 10 avec 4
 
 386 sur les 572 sont concernées avec une année à 1 ou 2 ou 4, donc pas problème récurrent sur la même parcelle année après année
-
 
 # 3. Plant families
 

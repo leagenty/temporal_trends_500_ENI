@@ -99,7 +99,6 @@ ggplot(plants_year2, aes(x = factor(year), y = Poaceae)) +
   )
 ```
 
-
 ## 2.2. Asteraceae
 
 ```{r}
@@ -136,7 +135,6 @@ ggplot(plants_year2, aes(x = factor(year), y = Asteraceae)) +
     legend.position = "none"
   )
 ```
-
 
 ## 2.3. Fabaceae
 
@@ -177,7 +175,6 @@ ggplot(plants_year2, aes(x = factor(year), y = Fabaceae)) +
   )
 ```
 
-
 ## 2.4. Plantaginaceae
 
 ```{r}
@@ -216,7 +213,6 @@ ggplot(plants_year2, aes(x = factor(year), y = Plantaginaceae)) +
     legend.position = "none"
   )
 ```
-
 
 ## 2.5. Convolvulaceae
 
@@ -283,7 +279,6 @@ r2(mod2)
 ```
 
 0.02 \*\*\*
-
 
 ```{r}
 ggplot(plants_year2, aes(x = factor(year), y = Rosaceae)) +
@@ -498,7 +493,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.004 \**
+0.004 \*\*
 
 ```{r}
 ggplot(plants_year2, aes(x = factor(year), y = abundance)) +
@@ -513,7 +508,6 @@ ggplot(plants_year2, aes(x = factor(year), y = abundance)) +
     legend.position = "none"
   ) 
 ```
-
 
 # 3. Per crop type
 

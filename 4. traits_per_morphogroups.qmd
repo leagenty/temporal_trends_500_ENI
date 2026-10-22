@@ -24,6 +24,8 @@ ab_coleo <- read.csv("4.traits_per_morphogroups/input/ab_coleo_sp.csv") %>%
   mutate(somme=sum(ab)) 
   
 
+ab_coleo_sp <- read.csv("4.traits_per_morphogroups/input/coleo_long_format.csv")
+
 traits <-  read.csv("4.traits_per_morphogroups/input/bdd_traits_coleo.csv",sep=";") %>% 
   select(4,24,33,44,52) %>% 
    rename(diet_imagos=Regime.alimentaire.des.imagos,
@@ -372,3 +374,57 @@ morphog_ab_tr <- morphog_flovis %>%
 
 #write.csv(morphog_ab_tr,"4.traits_per_morphogroups/output/trait_status_morphog.csv")
 ```
+
+# 7. Most abundant species in each morphogroup
+```{r}
+ordre_morphog <- c(
+  "Jewel_beetles",
+  "Longhorn_beetles",
+  "Tumbling_flower_beetles",
+  "Ground_beetles",
+  "Rove_beetles",
+  "Click_beetles",
+  "False_blister_beetles",
+  "Seed_beetles",
+  "Soft_wing_flower_beetles",
+  "Soldier_beetles",
+  "Ladybugs",
+  "Sap_beetles",
+  "Weevils",
+  "Leaf_beetles"
+)
+
+ab_sp_scale <- ab_coleo_sp |> 
+  group_by(species_coleo) |> 
+  summarise(total_ab = sum(ab_coleo)) |> 
+  ungroup() |> 
+  left_join(corres) |> 
+  group_by(morphog) |> 
+   slice_max(order_by = total_ab, n = 10, with_ties = FALSE) |> 
+ mutate(
+    morphog = ifelse(morphog == "Bruches", "Seed_beetles",
+    ifelse(morphog == "Buprestes", "Jewel_beetles",
+    ifelse(morphog == "Cantharides", "Soldier_beetles",
+    ifelse(morphog == "Carabiques", "Ground_beetles",
+    ifelse(morphog == "Charancons", "Weevils",
+    ifelse(morphog == "Chrysomeles", "Leaf_beetles",
+    ifelse(morphog == "Coccinelles", "Ladybugs",
+    ifelse(morphog == "Divers-_Petits_coleopteres_avec_antennes_en_massues", "Sap_beetles",
+    ifelse(morphog == "Elaterides", "Click_beetles",
+    ifelse(morphog == "Longicornes", "Longhorn_beetles",
+    ifelse(morphog == "Malachites", "Soft_wing_flower_beetles",
+    ifelse(morphog == "Mordelles", "Tumbling_flower_beetles",
+    ifelse(morphog == "Oedemerides", "False_blister_beetles",
+    ifelse(morphog == "Staphylins", "Rove_beetles",
+           morphog
+    ))))))))))))))
+  ) |> 
+  select(morphog,species_coleo,total_ab) |> 
+    mutate(morphog = factor(morphog, levels =ordre_morphog)) |> 
+  arrange(morphog) |> 
+  filter(!is.na(morphog))
+
+#write.csv(ab_sp_scale,"4.traits_per_morphogroups/output/ab_sp_scale.csv")
+```
+
+
