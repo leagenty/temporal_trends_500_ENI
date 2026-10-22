@@ -50,30 +50,11 @@ coleo_month_wide <- coleo_m %>%
          id_parcelle=as.character(id_parcelle)) %>% 
   drop_na(annee) %>% 
   filter(annee>2012&annee<2025)
-
-nb_samp <- coleo_month_wide %>% 
-  select(id_parcelle,date,annee) %>% 
-  distinct() %>% 
-  group_by(id_parcelle,annee) %>% 
-  mutate(nbr_samp_annee = n()) %>% 
-  ungroup() %>% 
-  select(id_parcelle,annee,nbr_samp_annee) %>% 
-  distinct() %>% 
-  filter(nbr_samp_annee==2) 
-
-samp_souci <- nb_samp_deux %>% 
-  rbind(nb_samp_un) %>% 
-  rbind(nb_samp_quatre) %>% 
-  distinct()
 ```
 
-4738 / 5568 samples avec 3 (86% des échantillons) 656 avec 2 164 avec 1 10 avec 4
-
-386 sur les 572 sont concernées avec une année à 1 ou 2 ou 4, donc pas problème récurrent sur la même parcelle année après année
 
 ## 2.2. Morphogroup per year
 
-Vérifier que j'ai bien 3 passages par an par site, si ce n'est pas le cas je divise par le nombre de passages
 
 ```{r}
 coleo_year <- coleo_month_wide %>% 
@@ -187,6 +168,39 @@ coleo_year <- coleo_year %>%
   left_join(rich_and_ab_year) %>% 
   left_join(coleo_year_traits)
 ```
+
+```{r}
+nb_samp_trois <- coleo_month_wide %>% 
+  select(id_parcelle,date,annee) %>% 
+  distinct() %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(nbr_samp_annee = n()) %>% 
+  ungroup() %>% 
+  select(id_parcelle,annee,nbr_samp_annee) %>% 
+  distinct() %>% 
+  filter(nbr_samp_annee==3) 
+
+write.csv(nb_samp_trois,"1.clean_dataset/output/nb_samples_trois.csv")
+```
+
+```{r}
+nb_samp_trois <- coleo_month_wide %>% 
+  select(id_parcelle,date,annee) %>% 
+  distinct() %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(nbr_samp_annee = n()) %>% 
+  ungroup() %>% 
+  select(id_parcelle,annee,nbr_samp_annee) %>% 
+  distinct() %>% 
+  filter(nbr_samp_annee==3) 
+
+write.csv(nb_samp_trois,"1.clean_dataset/output/nb_samples_trois.csv")
+```
+
+4738 / 5568 samples avec 3 (86% des échantillons) 656 avec 2 164 avec 1 10 avec 4
+
+386 sur les 572 sont concernées avec une année à 1 ou 2 ou 4, donc pas problème récurrent sur la même parcelle année après année
+
 
 # 3. Plant families
 

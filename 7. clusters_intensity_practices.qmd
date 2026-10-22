@@ -148,7 +148,7 @@ summary(clusters)
 
 cah$desc.axes
 
-#write.csv(clusters,"7.clusters_intensity_practices/output/clusters.csv")
+write.csv(clusters,"7.clusters_intensity_practices/output/clusters.csv")
 ```
 
 # 4. Cluster description
@@ -241,25 +241,35 @@ ggplot(aes(x=clust,y=nbr_fungicides,fill=clust),data=clusters) +
   stat_compare_means(method = "kruskal.test", label.x = 2)
 ```
 
+
+### Saving clusters for GIS
+
+```{r}
+clust <- clusters %>% 
+  select(id_parcelle,year,clust)
+
+
+clust2 <- clust %>%
+  group_by(id_parcelle, clust) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(id_parcelle) %>%
+  slice_max(order_by = n, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    id_parcelle,
+    cluster = as.character(clust)
+  )
+
+
+#write.csv(clust2,"7.clusters_intensity_practices/output/clust_for_gis.csv")
+```
+
 # 5. Temporal trends according to cluster
 
 ```{r}
 clust <- clusters %>% 
   select(id_parcelle,year,clust)
 
-clust2 <- clust %>%  
-  group_by(id_parcelle) %>%
-  mutate(
-    cluster = if_else(
-      n_distinct(clust) == 1,
-      as.character(first(clust)),
-      "mixed"
-    )
-  ) %>%
-  ungroup() %>% 
-  select(id_parcelle,cluster) %>% 
-  distinct()
-#write.csv(clust2,"7.clusters_intensity_practices/output/clust_for_gis.csv")
 
 plants_year <- read.csv("7.clusters_intensity_practices/input/plants_year.csv") %>% 
   mutate(id_parcelle=as.character(id_parcelle)) %>% 
@@ -278,6 +288,9 @@ coleo_year$year <- coleo_year$year - mean(coleo_year$year)
 
 ```
 
+
+
+
 ## 5.1. Beetles
 
 ### 5.1.1. Bruches
@@ -291,7 +304,6 @@ testDispersion(sim_res)
 testZeroInflation(sim_res)
 
 summary(mod)
-r2(mod)
 ```
 
 just year
@@ -326,6 +338,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 effets clust \*\*\* et interaction \* year : 0.069 dans le cluster 2, ns dans le 1
@@ -403,6 +416,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 annee ns clust signif interaction \* : effet neg annee dans cluster 2
@@ -450,6 +464,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 clust trend interaction \*\*\* : effet pos dans cluster 2
@@ -609,6 +624,8 @@ Anova(mod)
 
 just year
 
+
+
 ### 5.1.16. Abondance
 
 ```{r}
@@ -623,6 +640,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 year \*\*\* and interaction : effet year pos cluster 1
@@ -700,6 +718,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 year \*\*\* and interaction \*\*: effet pos dans cluster 1
@@ -755,6 +774,7 @@ summary(mod2)
 Anova(mod2)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod2)
 ```
 
 year **clust** interaction \*\*\* : effet pos dans cluster 2
@@ -854,6 +874,7 @@ summary(mod2)
 Anova(mod2)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod2)
 ```
 
 year **interaction** : effet neg clust 1
@@ -907,6 +928,7 @@ summary(mod2)
 Anova(mod2)
 tr <- emtrends(mod2, ~ clust, var = "year")
 test(tr)
+r2(mod2)
 ```
 
 interaction \* : effet pos dans cluster 2
@@ -1065,6 +1087,8 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r_deux <- r2(mod)
+print(r_deux,digits=4)
 ```
 
 trend interaction : effet pos dans cluster 2
@@ -1110,6 +1134,7 @@ summary(mod)
 Anova(mod)
 tr <- emtrends(mod, ~ clust, var = "year")
 test(tr)
+r2(mod)
 ```
 
 interaction \*\*\*: effet pos dans cluster 2

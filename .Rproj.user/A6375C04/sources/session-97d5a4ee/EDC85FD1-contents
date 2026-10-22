@@ -1,0 +1,209 @@
+---
+title: "2. cwm_floral_traits"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open data
+
+```{r}
+select <- dplyr::select
+library(vegan)
+library(FD)
+library(tidyverse)
+
+floral_traits <- read.csv(file="2.cwm_floral_traits/input/floral_traits_sp.csv") %>% 
+  select(-X) %>% 
+  column_to_rownames("nom.eni") %>% 
+  select(where(is.numeric)) %>% 
+  rownames_to_column("nom.eni")
+
+flore <- read.csv(file="2.cwm_floral_traits/input/flore_long2025.csv",sep=",") %>% 
+  select(-X) %>% 
+  mutate(annee=ifelse(annee=="19","2019",
+                     ifelse(annee=="20","2020",annee))) 
+
+names_traits <-  read.csv(file="2.cwm_floral_traits/input/floral_traits_sp.csv",sep=",") %>% 
+  select(nom.eni) %>% 
+  distinct()
+```
+
+In the name traits dataframe we have the names of the species for which we have at least one trait
+
+# 2. Select only species with traits and turn it to wide format, pooling all years at the plot scale
+
+```{r}
+flore_long <- flore %>% 
+  filter(nom.eni %in% names_traits$nom.eni)
+
+flore_traits_sp <- flore %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_tot = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_sp_traits = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  mutate(completude = ab_sp_traits/ab_tot*100) %>%
+  filter(completude > 79.99) %>% 
+  # check completude in order to eliminate communities with completude < 80
+  # from 68516 to 62089 lines
+  # from 4656 to 4098 samples (1 plot/year)
+  select(-ab_tot,-ab_sp_traits,-completude) %>% 
+  mutate(id_uniq = paste(id_parcelle, annee, sep = "_")) %>% 
+  select(id_uniq,nom.eni,ab_pl) %>% 
+  group_by(id_uniq,nom.eni) %>% 
+  summarise(ab_pl=sum(ab_pl)) %>% #i sum the lines for which we have the same species twice on the same site the same year but with 2 different abundance scores (5 lines)
+  distinct() #%>% 
+  #pivot_wider(names_from="nom.eni",
+             # values_from = "ab_pl",
+              #values_fill=0) 
+
+
+
+names_traits_sp <- flore %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_tot = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(ab_sp_traits = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  mutate(completude = ab_sp_traits/ab_tot*100) %>%
+  filter(completude > 79.99) %>% 
+  select(nom.eni) %>% 
+  filter(nom.eni %in% names_traits$nom.eni) %>% 
+  distinct()
+```
+
+In our traits dataset we have some species that we did not find in our botanical sampling, we have to remove them from the traits dataset
+
+```{r}
+traits_dataset_species <- floral_traits %>% 
+  distinct() %>% 
+   filter(nom.eni %in% names_traits_sp$nom.eni) %>% 
+  mutate(across(where(is.integer), as.numeric))
+```
+
+# 3. Measure CWM
+
+```{r}
+ou_na <- traits_dataset_species %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "column", values_to = "na_count")
+
+traits_dataset_species <- traits_dataset_species %>% 
+  mutate(Seed_mass_NA = ifelse(is.na(Seed_mass_NA), 
+                               mean(Seed_mass_NA, na.rm = TRUE), 
+                               Seed_mass_NA))
+
+ab_entomog <- flore_traits_sp %>% 
+  left_join(traits_dataset_species) %>% 
+  select(id_uniq, nom.eni, ab_pl, pollmode_num) %>% 
+  group_by(id_uniq) %>% 
+  mutate(
+    occ = if_else(pollmode_num == 2, 1, 0),
+    ab_val = if_else(pollmode_num == 2, ab_pl, 0) # ne compte que les espèces 100% entomogames
+  ) %>% 
+  summarise(
+    rich_entomog = sum(occ, na.rm = TRUE),
+    ab_entomog   = sum(ab_val, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ab_col <- flore_traits_sp %>% 
+  left_join(traits_dataset_species) %>% 
+  select(id_uniq, nom.eni, ab_pl, green) %>% 
+  mutate(col = ifelse(green==0,"other_col","col_green")) %>% 
+    mutate(occ = 1) %>% 
+      select(-green) %>% 
+  group_by(id_uniq,col) %>% 
+  summarise(
+    rich = sum(occ, na.rm = TRUE),
+    ab  = sum(ab_pl, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = col,
+  values_from = c("rich","ab"),
+  values_fill = 0)
+
+cwms <- flore_traits_sp %>% 
+  left_join(traits_dataset_species) %>% 
+  group_by(id_uniq) %>% 
+  mutate(sum_ab=sum(ab_pl)) %>% 
+  mutate(
+    CWM_green = sum(green*ab_pl/sum_ab),
+    CWM_other_col = 1-CWM_green,
+    CWM_height_max = sum(Height_max*ab_pl/sum_ab),
+    CWM_seed_mass = sum(Seed_mass_NA*ab_pl/sum_ab),
+    CWM_flow_on = sum(Flow_on*ab_pl/sum_ab),
+    CWM_flow_dur = sum(Flow_dur*ab_pl/sum_ab),
+    CWM_EIV_N = sum(EIV_N*ab_pl/sum_ab),
+    CWM_perennial = sum(perennial_num*ab_pl/sum_ab),
+    CWM_nectar = sum(nectar_num*ab_pl/sum_ab),
+    CWM_nat_val = sum(nat_val_num*ab_pl/sum_ab),
+    CWM_forbs = sum(forbs_num*ab_pl/sum_ab),
+    CWM_pollmode = sum(pollmode_num*ab_pl/sum_ab),
+    CWM_syndr_poll_axis = sum(syndr_poll_axis*ab_pl/sum_ab)
+    ) %>% 
+  select(id_uniq, CWM_green,CWM_other_col,CWM_height_max,CWM_seed_mass,CWM_flow_on,CWM_flow_dur,CWM_EIV_N,CWM_perennial,CWM_nectar,CWM_forbs,CWM_nat_val,CWM_pollmode,CWM_syndr_poll_axis) %>% 
+  distinct() %>% 
+  left_join(ab_entomog) %>% 
+  left_join(ab_col)
+
+pourc_var_quali <- flore_traits_sp %>%
+  left_join(traits_dataset_species) %>% 
+  mutate(perennial=as_factor(perennial_num)) %>% 
+  group_by(id_uniq,perennial) %>% 
+  summarise(ab_pl=sum(ab_pl)) %>% 
+  mutate(sum_tot = sum(ab_pl)) %>% 
+  mutate(pourc_perennial = ab_pl / sum_tot * 100) #just to check that the CWM = the % of abundance in each category for qualitative variables
+# it's ok
+```
+
+# 4. Richness and abundance
+
+```{r}
+rich_ab <- flore_long %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(richness= n_distinct(nom.eni),
+         ab_tot = sum(ab_pl)) %>% 
+  select(id_parcelle,annee,richness,ab_tot) %>% 
+  distinct()
+  
+```
+
+# 5. Corrplot between floral traits at the community level
+
+```{r}
+floral_traits_cor <- cwms %>%
+  separate(id_uniq, into = c("id_parcelle", "year"), sep = "_") %>% 
+  select(-year) %>% 
+  group_by(id_parcelle) %>% 
+  summarise_all(mean) %>% 
+  column_to_rownames("id_parcelle")
+
+
+corr <- cor(floral_traits_cor, use="complete.obs")
+
+corr_masked <- corr
+corr_masked[abs(corr_masked) < 0.3] <- NA 
+
+corrplot(corr_masked, method = "circle", 
+         type = "lower",    # Montrer seulement le triangle inférieur
+         tl.cex = 0.6,      # Ajuster la taille des étiquettes
+         tl.col = "black",  # Changer la couleur des étiquettes en noir
+         addCoef.col = "black", # Ajouter les valeurs numériques en noir
+         number.cex=0.6, #changer la taille des coeff de corr
+         na.label = " ",    # Ne pas afficher les valeurs NA
+         col = colorRampPalette(c("red", "white", "blue"))(200)) # Palette de couleurs
+```
+
+# 6. Save data
+
+```{r}
+#write.csv(cwms,file="2.cwm_floral_traits/output/plants_cwm_plot_year.csv")
+#write.csv(rich_ab,file="2.cwm_floral_traits/output/rich_ab_plot_year.csv")
+
+```

@@ -54,6 +54,7 @@ plants_year <- plants_tot %>%
 # 2. Dynamic of abundance of each family
 
 ```{r}
+plants_year2 <- plants_year
 plants_year$year <- plants_year$year - mean(plants_year$year)
 ```
 
@@ -84,6 +85,21 @@ r2(mod)
 
 0.008 \*\*\*
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Poaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="darkolivegreen4", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Poaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+
 ## 2.2. Asteraceae
 
 ```{r}
@@ -106,6 +122,21 @@ Anova(mod2)
 ```
 
 ns
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Asteraceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="darkgoldenrod1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Asteraceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 
 ## 2.3. Fabaceae
 
@@ -132,6 +163,21 @@ r2(mod2)
 
 -0.01 \*
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Fabaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="orchid4", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Fabaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+
 ## 2.4. Plantaginaceae
 
 ```{r}
@@ -156,6 +202,21 @@ r2(mod2)
 ```
 
 -0.01 \*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Plantaginaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="lightsteelblue2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plantaginaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 
 ## 2.5. Convolvulaceae
 
@@ -183,6 +244,20 @@ r2(mod)
 
 -0.009 \*\*\*
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Convolvulaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Convolvulaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 ## 2.6. Rosaceae
 
 ```{r}
@@ -209,6 +284,21 @@ r2(mod2)
 
 0.02 \*\*\*
 
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Rosaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="hotpink", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Rosaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 ## 2.7. Geraniaceae
 
 ```{r}
@@ -233,6 +323,20 @@ r2(mod)
 ```
 
 0.03 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Geraniaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="purple3", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Geraniaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
 
 ## 2.8. Apiaceae
 
@@ -259,6 +363,20 @@ Anova(mod2)
 
 ns
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Apiaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="paleturquoise", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Apiaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 ## 2.9. Polygonaceae
 
 ```{r}
@@ -283,6 +401,20 @@ r2(mod2)
 
 -0.02 \*\*
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Polygonaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="salmon3", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Polygonaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 ## 2.10. Rubiaceae
 
 ```{r}
@@ -306,6 +438,20 @@ summary(mod2)
 
 ns
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Rubiaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="olivedrab", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Rubiaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
 ## 2.11. Richness
 
 ```{r}
@@ -324,6 +470,20 @@ print(r2_res, digits = 4)
 
 0.0065 \*\*\*
 
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = richness)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="orange2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plant richness"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
 ## 2.12. Abundance
 
 ```{r}
@@ -339,6 +499,21 @@ r2(mod)
 ```
 
 0.004 \**
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = abundance)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="mistyrose2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plant abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
 
 # 3. Per crop type
 

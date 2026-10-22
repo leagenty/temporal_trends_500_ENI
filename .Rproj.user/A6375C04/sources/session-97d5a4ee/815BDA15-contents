@@ -1,0 +1,323 @@
+---
+title: "1. clean_dataset"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open data
+
+```{r}
+library(tidyverse)
+select <- dplyr::select
+
+obs_coleo <-  read_delim("1.clean_dataset/input/obs_coleo.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE) %>% 
+  mutate(groupe_coleoptere=as.factor(groupe_coleoptere)) %>% 
+  select(id_obs,transect,groupe_coleoptere,abondance,richesse_estimee)
+
+obs_comptage <- read_delim("1.clean_dataset/input/obs_comptage.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE) %>%   
+  filter(protocole=="Coléoptère") %>% 
+  select(id_obs,id_parcelle,id_obs,code_parcelle,jour,mois,annee) 
+trait_morphog <- read.csv("1.clean_dataset/input/trait_status_morphog.csv",sep=";") 
+```
+
+#2. Coleo morphogroup data
+
+```{r}
+coleo_m <- obs_coleo %>% 
+  left_join(obs_comptage) %>% 
+  mutate(richesse_estimee=as.numeric(richesse_estimee),
+         id_parcelle=as.character(id_parcelle))
+
+```
+
+## 2.1. Morphogroups per month
+
+```{r}
+coleo_month_wide <- coleo_m %>%
+  mutate(date=paste(annee,mois,jour,sep="/")) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(id_parcelle,date,groupe_coleoptere,abondance) %>% 
+    group_by(id_parcelle,date,groupe_coleoptere) %>% 
+  summarise(abondance=sum(abondance)) %>% 
+  ungroup() %>%
+  pivot_wider(names_from = groupe_coleoptere,
+              values_from = abondance,
+              values_fill = 0 ) %>% 
+  mutate(mois=month(date),
+         annee=year(date),
+         id_parcelle=as.character(id_parcelle)) %>% 
+  drop_na(annee) %>% 
+  filter(annee>2012&annee<2025)
+```
+
+
+## 2.2. Morphogroup per year
+
+
+```{r}
+coleo_year <- coleo_month_wide %>% 
+  select(-mois) %>% 
+  group_by(annee, id_parcelle) %>% 
+  summarise_if(is.numeric,sum)
+```
+
+## 2.3. Richness and abundance
+
+```{r}
+rich_and_ab_month <- coleo_m %>% 
+  mutate(date=paste(annee,mois,jour,sep="/")) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(id_parcelle,annee,date,groupe_coleoptere,abondance,richesse_estimee) %>% 
+  group_by(id_parcelle,groupe_coleoptere,date) %>%
+  mutate(richesse_estimee = ifelse(abondance==1,1,richesse_estimee)) %>%
+  ungroup() %>% 
+    group_by(id_parcelle,date) %>% 
+  summarise(richesse_estimee= sum(richesse_estimee),
+         ab_tot=sum(abondance)) %>% 
+  ungroup() 
+```
+
+## 2.4. Richness and ab year scale
+
+```{r}
+rich_and_ab_year <- rich_and_ab_month %>%
+  mutate(annee=year(date)) %>% 
+    group_by(annee, id_parcelle) %>% 
+  mutate(richesse_estimee=mean(richesse_estimee),
+         ab_tot=sum(ab_tot)) %>% 
+  select(annee,id_parcelle,richesse_estimee,ab_tot) %>% 
+  distinct()
+```
+
+## 2.5. Traits morphogroups dataset
+
+```{r}
+coleo_m_traits <- coleo_m %>% 
+  left_join(trait_morphog)
+
+coleo_month_wide_pred <- coleo_m_traits %>%
+  mutate(date=paste(annee,mois,jour,sep="/")) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(id_parcelle,date,morphog_pred,abondance) %>% 
+    group_by(id_parcelle,date,morphog_pred) %>% 
+  summarise(abondance=sum(abondance)) %>% 
+  ungroup() %>%
+  pivot_wider(names_from = morphog_pred,
+              values_from = abondance,
+              values_fill = 0 ) %>% 
+  mutate(mois=month(date),
+         annee=year(date),
+         id_parcelle=as.character(id_parcelle)) %>% 
+  drop_na(annee) %>% 
+  filter(annee>2012&annee<2025)
+
+coleo_month_wide_flovis <- coleo_m_traits %>%
+  mutate(date=paste(annee,mois,jour,sep="/")) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(id_parcelle,date,morphog_flovis,abondance) %>% 
+    group_by(id_parcelle,date,morphog_flovis) %>% 
+  summarise(abondance=sum(abondance)) %>% 
+  ungroup() %>%
+  pivot_wider(names_from = morphog_flovis,
+              values_from = abondance,
+              values_fill = 0 ) %>% 
+  mutate(mois=month(date),
+         annee=year(date),
+         id_parcelle=as.character(id_parcelle)) %>% 
+  drop_na(annee) %>% 
+  filter(annee>2012&annee<2025)
+
+coleo_month_wide_pest <- coleo_m_traits %>%
+  mutate(date=paste(annee,mois,jour,sep="/")) %>% 
+  mutate(date=ymd(date)) %>% 
+  select(id_parcelle,date,morphog_pest,abondance) %>% 
+    group_by(id_parcelle,date,morphog_pest) %>% 
+  summarise(abondance=sum(abondance)) %>% 
+  ungroup() %>%
+  pivot_wider(names_from = morphog_pest,
+              values_from = abondance,
+              values_fill = 0 ) %>% 
+  mutate(mois=month(date),
+         annee=year(date),
+         id_parcelle=as.character(id_parcelle)) %>% 
+  drop_na(annee) %>% 
+  filter(annee>2012&annee<2025)
+
+coleo_month_wide_traits <-  coleo_month_wide_pest %>% 
+  left_join(coleo_month_wide_flovis) %>% 
+  left_join(coleo_month_wide_pred)
+
+coleo_year_traits <- coleo_month_wide_traits %>% 
+  select(-mois) %>% 
+  group_by(annee, id_parcelle) %>% 
+  summarise_if(is.numeric,sum)
+```
+
+## 2.6. Pool datasets
+
+Dataset month scale
+
+```{r}
+coleo_month_wide <- coleo_month_wide %>% 
+  left_join(rich_and_ab_month) %>% 
+  left_join(coleo_month_wide_traits)
+
+coleo_year <- coleo_year %>% 
+  left_join(rich_and_ab_year) %>% 
+  left_join(coleo_year_traits)
+```
+
+```{r}
+nb_samp_trois <- coleo_month_wide %>% 
+  select(id_parcelle,date,annee) %>% 
+  distinct() %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(nbr_samp_annee = n()) %>% 
+  ungroup() %>% 
+  select(id_parcelle,annee,nbr_samp_annee) %>% 
+  distinct() %>% 
+  filter(nbr_samp_annee==3) 
+
+write.csv(nb_samp_trois,"1.clean_dataset/output/nb_samples_trois.csv")
+```
+
+```{r}
+nb_samp_trois <- coleo_month_wide %>% 
+  select(id_parcelle,date,annee) %>% 
+  distinct() %>% 
+  group_by(id_parcelle,annee) %>% 
+  mutate(nbr_samp_annee = n()) %>% 
+  ungroup() %>% 
+  select(id_parcelle,annee,nbr_samp_annee) %>% 
+  distinct() %>% 
+  filter(nbr_samp_annee==3) 
+
+write.csv(nb_samp_trois,"1.clean_dataset/output/nb_samples_trois.csv")
+```
+
+4738 / 5568 samples avec 3 (86% des échantillons) 656 avec 2 164 avec 1 10 avec 4
+
+386 sur les 572 sont concernées avec une année à 1 ou 2 ou 4, donc pas problème récurrent sur la même parcelle année après année
+
+
+# 3. Plant families
+
+## 3.1. Open plant data
+
+```{r}
+flore <- read.csv(file="1.clean_dataset/input/flore_long2025.csv",sep=";") %>%  
+  mutate(year=as.numeric(annee)) %>% 
+  select(-annee) %>% 
+  mutate(year=ifelse(year=="19","2019",
+                     ifelse(year=="20","2020",year))) %>% 
+  rename(nom_eni=nom.eni) 
+
+
+famille <-  read_delim("1.clean_dataset/input/sp_fam_500ENI.csv")
+```
+
+## 3.2. Add family informations
+
+```{r}
+fam_flo_ab <- flore %>% 
+  left_join(famille) %>% 
+  group_by(famille,id_parcelle,year) %>% 
+  summarise(ab_fam=sum(ab_pl))
+
+fam_flo_rich <- flore %>% 
+  left_join(famille) %>% 
+  mutate(occ=1) %>% 
+  group_by(famille,id_parcelle,year) %>% 
+  summarise(rich_fam=sum(occ))
+```
+
+### Most common species in each family
+
+```{r}
+ab_sp_per_fam <- flore %>% 
+  left_join(famille) %>% 
+  group_by(nom_eni) %>% 
+  mutate(ab_sp = sum(ab_pl)) %>% 
+  ungroup() %>% 
+  select(famille,nom_eni,ab_sp) %>% 
+  distinct() %>% 
+  filter(famille == "Poaceae"|famille=="Asteraceae"|famille=="Fabaceae"|famille=="Plantaginaceae"|famille=="Convolvulaceae"|famille=="Rosaceae"|famille=="Geraniaceae"|famille=="Apiaceae"|famille=="Polygonaceae"|famille=="Rubiaceae") %>% 
+  group_by(famille) %>% 
+  slice_max(order_by = ab_sp, n = 10, with_ties = FALSE) %>% #ici je sélectionne les 10 espèces les plus abondantes pour chaque famille
+  ungroup() 
+  
+write.csv(ab_sp_per_fam,file="1.clean_dataset/output/dix_sp_plus_ab_par_famille_plantes.csv")
+```
+
+## 3.3. Turn wide
+
+```{r}
+fam_flo_wide_ab <- fam_flo_ab %>% 
+  pivot_wider(names_from = famille,
+    values_from = ab_fam,
+    values_fill= 0
+  ) %>% 
+    filter(year>2012) %>% 
+  filter(year<2025) %>% 
+  mutate(id_parcelle=as.factor(id_parcelle),
+         year=as.numeric(year))
+
+fam_flo_wide_rich <- fam_flo_rich %>% 
+  pivot_wider(names_from = famille,
+    values_from = rich_fam,
+    values_fill= 0
+  ) %>% 
+   filter(year>2012) %>% 
+  filter(year<2025)  %>% 
+  mutate(id_parcelle=as.factor(id_parcelle),  
+         year=as.numeric(year))
+```
+
+## 3.4. Richness & ab
+
+```{r}
+rich_ab_tot <- flore %>%
+   mutate(occ=1) %>% 
+  group_by(id_parcelle,year) %>% 
+  mutate(richness= sum(occ),
+         abundance = sum(ab_pl)) %>% 
+  mutate(year=as.numeric(year)) %>% 
+  ungroup() %>% 
+  select(id_parcelle,year,richness,abundance) %>% 
+  distinct()%>% 
+  mutate(id_parcelle=as.factor(id_parcelle)) 
+```
+
+## 3.5. Pool dataset
+
+```{r}
+dataset_plants <- fam_flo_wide_ab %>% 
+  select(id_parcelle,year,Poaceae,Asteraceae,Fabaceae,Plantaginaceae,Convolvulaceae,Rosaceae,Geraniaceae,Apiaceae,Polygonaceae,Rubiaceae) %>% 
+  left_join(rich_ab_tot)
+
+write.csv(dataset_plants,file="1.clean_dataset/output/dataset_plant_families.csv")
+```
+
+# 4. Save outputs
+
+```{r}
+write.csv(coleo_month_wide,"1.clean_dataset/output/coleo_month_wide.csv")
+
+write.csv(coleo_year,"1.clean_dataset/output/coleo_year.csv")
+```
+
+# 5. Cluster data for GIS
+
+```{r}
+cluster <- read.csv(file="1.clean_dataset/input/clust_for_gis.csv") %>% 
+  select(-X)
+
+plots <- read.csv(file="1.clean_dataset/input/plot_coordinates.csv",sep=";") %>% 
+  filter(id_parcelle %in% cluster$id_parcelle) %>% 
+  left_join(cluster)
+
+write.csv(plots,"1.clean_dataset/output/plots_coord_with_cluster.csv")
+
+```
