@@ -1,0 +1,1025 @@
+---
+title: "5. family_level_temporal_trends"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Open data
+
+```{r}
+select <- dplyr::select
+library(tidyverse)
+library(lubridate)
+library(DHARMa)
+library(glmmTMB)
+library(car)
+library(performance)
+
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)
+  rp <- residuals(model, type = "pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq / rdf
+  pval <- pchisq(Pearson.chisq, df = rdf, lower.tail = FALSE)
+  c(chisq = Pearson.chisq, ratio = prat, rdf = rdf, p = pval)
+}
+
+crop <- read.csv(file="5.temporal_plant_family/input/region_and_crop_type.csv",sep=";")%>% 
+  mutate(id_parcelle=as.factor(id_parcelle)) %>% 
+  rename(crop=TypeCulture)
+
+plants_tot <- read.csv(file="5.temporal_plant_family/input/dataset_plant_families.csv") %>% 
+  select(-X) %>% 
+  mutate(id_parcelle=as.factor(id_parcelle)) %>% 
+  left_join(crop) 
+
+
+
+plots_plus_sept <- plants_tot %>% 
+  select(id_parcelle,year) %>% 
+  distinct() %>% 
+  group_by(id_parcelle) %>% 
+  mutate(nbre_annee= n_distinct(year)) %>% 
+  select(id_parcelle,nbre_annee) %>% 
+  distinct() %>% 
+  filter(nbre_annee > 7)
+
+plants_year <- plants_tot %>% 
+  filter(id_parcelle %in% plots_plus_sept$id_parcelle)
+#write.csv(plants_year,file="5.temporal_plant_family/output/plants_year.csv")
+```
+
+# 2. Dynamic of abundance of each family
+
+```{r}
+plants_year2 <- plants_year
+plants_year$year <- plants_year$year - mean(plants_year$year)
+```
+
+## 2.1. Poaceae
+
+```{r}
+mod <- glmmTMB(Poaceae ~ year + (1| id_parcelle) ,  data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Poaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+summary(mod)
+Anova(mod2)
+r2(mod2)
+r2(mod)
+```
+
+0.008 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Poaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="darkolivegreen4", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Poaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.2. Asteraceae
+
+```{r}
+mod <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Asteraceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="darkgoldenrod1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Asteraceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.3. Fabaceae
+
+```{r}
+mod <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+r2(mod2)
+```
+
+-0.01 \*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Fabaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="orchid4", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Fabaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.4. Plantaginaceae
+
+```{r}
+modn <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+r2(mod2)
+```
+
+-0.01 \*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Plantaginaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="lightsteelblue2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plantaginaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.5. Convolvulaceae
+
+```{r}
+mod <- glmmTMB(Convolvulaceae ~ year +  (1| id_parcelle), data=plants_year,family=nbinom1)
+
+
+summary(mod)
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+r2(mod)
+```
+
+-0.009 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Convolvulaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Convolvulaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.6. Rosaceae
+
+```{r}
+mod <- glmmTMB(Rosaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Rosaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+r2(mod2)
+```
+
+0.02 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Rosaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="hotpink", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Rosaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.7. Geraniaceae
+
+```{r}
+mod <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+r2(mod)
+```
+
+0.03 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Geraniaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="purple3", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Geraniaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.8. Apiaceae
+
+```{r}
+mod <- glmmTMB(Apiaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Apiaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Apiaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="paleturquoise", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Apiaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.9. Polygonaceae
+
+```{r}
+mod <- glmmTMB(Polygonaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Polygonaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+r2(mod2)
+```
+
+-0.02 \*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Polygonaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="salmon3", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Polygonaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+## 2.10. Rubiaceae
+
+```{r}
+mod <- glmmTMB(Rubiaceae  ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Rubiaceae ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+overdisp_fun(mod2)
+
+summary(mod2)
+```
+
+ns
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = Rubiaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="olivedrab", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Rubiaceae abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
+## 2.11. Richness
+
+```{r}
+mod <- glmmTMB(richness  ~ year + (1| id_parcelle) , data=plants_year,  family = nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+r2(mod)
+r2_res <- performance::r2(mod)
+print(r2_res, digits = 4)
+```
+
+0.0065 \*\*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = richness)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="orange2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plant richness"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
+## 2.12. Abundance
+
+```{r}
+mod <- glmmTMB(abundance  ~ year + (1| id_parcelle) , data=plants_year,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+r2(mod)
+```
+
+0.004 \*\*
+
+```{r}
+ggplot(plants_year2, aes(x = factor(year), y = abundance)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="mistyrose2", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Plant abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) 
+```
+
+# 3. Per crop type
+
+```{r}
+plants_year_ann <- plants_year %>% 
+  filter(crop!="Vineyard")
+plants_year_vin <- plants_year %>% 
+  filter(crop=="Vineyard")
+```
+
+## 3.1. Annual crops
+
+### 3.1.1. Poaceae
+
+```{r}
+mod <- glmmTMB(Poaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Poaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.1.2. Asteraceae
+
+```{r}
+mod <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.1.3. Fabaceae
+
+```{r}
+mod <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.1.4. Plantaginaceae
+
+```{r}
+mod <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+-0.01 \*\*
+
+### 3.1.5. Convolvulaceae
+
+```{r}
+mod <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+-0.01 \*\*\*
+
+### 3.1.6. Rosaceae
+
+```{r}
+mod <- glmmTMB(Rosaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod) #ok
+
+summary(mod)
+Anova(mod)
+```
+
+0.03 \*\*\*
+
+### 3.1.7. Geraniaceae
+
+```{r}
+mod <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+0.03 \*\*\*
+
+### 3.1.8. Apiaceae
+
+```{r}
+mod <- glmmTMB(Apiaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+overdisp_fun(mod)
+
+summary(mod2)
+Anova(mod2)
+```
+
+0.02 \*\*\*
+
+### 3.1.9. Polygonaceae
+
+```{r}
+mod <- glmmTMB(Polygonaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Polygonaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+-0.02 \*\*\*
+
+### 3.1.10. Rubiaceae
+
+```{r}
+mod <- glmmTMB(Rubiaceae  ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Rubiaceae ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.1.11. Richness
+
+```{r}
+mod <- glmmTMB(richness  ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+```
+
+ns
+
+### 3.1.12. Abundance
+
+```{r}
+mod <- glmmTMB(abundance  ~ year + (1| id_parcelle) , data=plants_year_ann,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+```
+
+ns
+
+## 3.2. Vineyards
+
+### 3.2.1. Poaceae
+
+```{r}
+mod <- glmmTMB(Poaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+mod2 <- glmmTMB(Poaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+0.03 \*\*\*
+
+### 3.2.2. Asteraceae
+
+```{r}
+mod <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Asteraceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.2.3. Fabaceae
+
+```{r}
+mod <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Fabaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.2.4. Plantaginaceae
+
+```{r}
+mod <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Plantaginaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.2.5. Convolvulaceae
+
+```{r}
+mod <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Convolvulaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.2.6. Rosaceae
+
+```{r}
+mod <- glmmTMB(Rosaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod) #ok
+
+summary(mod)
+Anova(mod)
+```
+
+0.03 \*\*
+
+### 3.2.7. Geraniaceae
+
+```{r}
+mod <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) # too much zero
+
+mod2 <- glmmTMB(Geraniaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1, ziformula = ~1)
+
+sim_res_zi <- simulateResiduals(mod2)
+testZeroInflation(sim_res_zi)
+AIC(mod,mod2) # zero inflated model better
+
+overdisp_fun(mod2)
+
+summary(mod2)
+Anova(mod2)
+```
+
+ns
+
+### 3.2.8. Apiaceae
+
+```{r}
+mod <- glmmTMB(Apiaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 3.2.9. Polygonaceae
+
+```{r}
+mod <- glmmTMB(Polygonaceae ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+overdisp_fun(mod)
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 3.2.10. Rubiaceae
+
+```{r}
+mod <- glmmTMB(Rubiaceae  ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod)
+Anova(mod)
+```
+
+ns
+
+### 3.2.11. Richness
+
+```{r}
+mod <- glmmTMB(richness  ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+```
+
+0.014 \*\*\*
+
+### 3.2.12. Abundance
+
+```{r}
+mod <- glmmTMB(abundance  ~ year + (1| id_parcelle) , data=plants_year_vin,family=nbinom1)
+
+sim_res <- simulateResiduals(mod, n = 1000)
+plot(sim_res)
+testDispersion(sim_res)
+testZeroInflation(sim_res)
+
+summary(mod)
+```
+
+0.016 \*\*\*

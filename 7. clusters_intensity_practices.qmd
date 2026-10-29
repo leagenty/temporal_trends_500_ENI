@@ -16,7 +16,6 @@ library(ggpubr)
 library(DHARMa)
 library(glmmTMB)
 library(car)
-library(broom.mixed)
 library(emmeans)
 library(ggeffects)
 select <- dplyr::select
@@ -289,8 +288,6 @@ coleo_year$year <- coleo_year$year - mean(coleo_year$year)
 ```
 
 
-
-
 ## 5.1. Beetles
 
 ### 5.1.1. Bruches
@@ -449,6 +446,45 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
         axis.title=element_text(size=16))+ 
   theme_graphique
 ```
+
+clust 1
+```{r}
+coleo_year1 <-  coleo_year |> 
+  filter(clust==1) |> 
+  filter(Chrysomèles<200)
+
+ggplot(coleo_year1, aes(x = factor(year), y = log1p(Chrysomèles))) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Leaf beetle abundance (clust 1)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+clust 2
+```{r}
+coleo_year2 <-  coleo_year |> 
+  filter(clust==2) |> 
+  filter(Chrysomèles<200)
+
+ggplot(coleo_year2, aes(x = factor(year), y = log1p(Chrysomèles))) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Leaf beetle abundance (clust2)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
 
 ### 5.1.7. Coccinelles
 
@@ -958,6 +994,42 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
     theme(axis.text=element_text(size=16),
         axis.title=element_text(size=16))+ 
   theme_graphique
+```
+
+clust 1
+```{r}
+plants_year1 <-  plants_year |> 
+  filter(clust==1) 
+
+ggplot(plants_year1, aes(x = factor(year), y = Convolvulaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Convolvulaceae abundance (clust 1)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
+
+clust 2
+```{r}
+plants_year2 <-  plants_year |> 
+  filter(clust==2) 
+
+ggplot(plants_year2, aes(x = factor(year), y = Convolvulaceae)) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Convolvulaceae abundance (clust2)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
 ```
 
 ### 5.2.6. Rosaceae

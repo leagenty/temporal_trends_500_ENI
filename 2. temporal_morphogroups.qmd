@@ -333,6 +333,7 @@ summary(mod)
 Anova(mod)
 r2(mod)
 ```
+
 ns
 
 ## 3.3. Cantharides
@@ -397,8 +398,22 @@ testZeroInflation(sim_res)
 summary(mod)
 r2(mod)
 ```
--0.01 **
-0.412 0.002
+
+-0.01 \*\* 0.412 0.002
+
+```{r}
+ggplot(coleo_year, aes(x = factor(annee), y = log1p(Chrysomèles))) +
+  geom_jitter(alpha=0.1) +
+  geom_boxplot(fill="pink1", alpha = 0.6) +
+  labs(
+    x = "Year",
+    y = "Leaf beetle abundance"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+```
 
 
 ## 3.7. Coccinelles
@@ -414,6 +429,7 @@ testZeroInflation(sim_res) # 18% sites avec zéro
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.8. Divers
@@ -509,7 +525,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.023 ** 0.051 \*\* dispersion annee
+0.023 \*\* 0.051 \*\* dispersion annee
 
 ## 3.14. Oedémérides
 
@@ -525,7 +541,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.01 *
+0.01 \*
 
 ## 3.15. Divers petits
 
@@ -542,7 +558,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.017  \*\*\* 0.112 \*\*\*
+0.017 \*\*\* 0.112 \*\*\*
 
 ## 4.2. Abundance
 
@@ -1647,8 +1663,7 @@ Anova(mod)
 r2(mod)
 ```
 
-effet pos annee 0.03 \*\*
-0.642 0.003
+effet pos annee 0.03 \*\* 0.642 0.003
 
 ## 8.2. Buprestes
 
@@ -1669,6 +1684,7 @@ AIC(mod,mod2) #mod sans zi better
 
 summary(mod)
 ```
+
 ns
 
 ## 8.3. Cantharides
@@ -1686,7 +1702,6 @@ summary(mod)
 
 ns
 
-
 ## 8.4. Carabiques
 
 ```{r}
@@ -1701,8 +1716,7 @@ summary(mod)
 r2(mod)
 ```
 
--0.03 \*\*\* 
-0.378 0.005
+-0.03 \*\*\* 0.378 0.005
 
 ## 8.5. Charançons
 
@@ -1728,8 +1742,7 @@ summary(mod)
 r2(mod)
 ```
 
--0.018 \*\*\* 
-0.419 0.003
+-0.018 \*\*\* 0.419 0.003
 
 ## 8.6. Chrysomèles
 
@@ -1755,8 +1768,7 @@ summary(mod)
 r2(mod)
 ```
 
--0.02 ***
-0.422 0.003
+-0.02 \*\*\* 0.422 0.003
 
 ## 8.7. Coccinelles
 
@@ -1778,8 +1790,8 @@ AIC(mod,mod2) #mod sans zi better
 summary(mod)
 r2(mod)
 ```
--0.01 *
-0.506 0.001
+
+-0.01 \* 0.506 0.001
 
 ## 8.8. Divers
 
@@ -1809,7 +1821,8 @@ testZeroInflation(sim_res) # 58% sites avec zéro
 
 summary(mod)
 ```
-ns 
+
+ns
 
 ## 8.10. Elatéridés
 
@@ -1823,6 +1836,7 @@ testZeroInflation(sim_res) # 43% sites avec zéro
 
 summary(mod)
 ```
+
 ns
 
 ## 8.11. Longicornes
@@ -1839,8 +1853,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.057 ***
-0.582 0.011
+0.057 \*\*\* 0.582 0.011
 
 ## 8.12. Malachites
 
@@ -1856,8 +1869,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.026 ***
-0.564 0.004
+0.026 \*\*\* 0.564 0.004
 
 ## 8.13. Mordelles
 
@@ -1873,8 +1885,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.017 trend
-0.495 0.001
+0.017 trend 0.495 0.001
 
 ## 8.14. Oedémérides
 
@@ -1888,6 +1899,7 @@ testZeroInflation(sim_res) # 38% sites avec zéro
 
 summary(mod)
 ```
+
 ns
 
 ## 8.15. Divers petits
@@ -1904,8 +1916,7 @@ summary(mod)
 r2(mod)
 ```
 
-0.016 ***
-0.799 0.039
+0.016 \*\*\* 0.799 0.039
 
 ## 8.16. Abundance
 
@@ -1919,5 +1930,5 @@ testZeroInflation(sim_res)
 
 summary(mod)
 ```
-ns
 
+ns
