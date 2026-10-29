@@ -6,7 +6,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-
 # 1. Open dataset
 
 ```{r}
@@ -40,6 +39,10 @@ coleo_tot <- coleo %>%
   relocate(id_uniq) %>% 
   select(-year)
 
+coleo_agri$year_c <- as.numeric(
+  scale(coleo_agri$annee, center = TRUE, scale = FALSE)
+)
+
 overdisp_fun <- function(model) {
   rdf <- df.residual(model)
   rp <- residuals(model, type = "pearson")
@@ -63,11 +66,7 @@ coleo_agri <- coleo_tot %>%
          !is.na(CoefN)) %>% 
   group_by(id_parcelle) %>% 
   mutate(nbre_annee= n_distinct(annee)) %>% 
-  filter(nbre_annee>7) %>%  # 201 fields only after removing NA and fields with less than 7 years of samples
-    mutate(nbre_pesticides=scale(nbre_pesticides),
-         nbre_interv=scale(nbre_interv),
-         CoefN=scale(CoefN),
-         nbre_pesticides=scale(nbre_pesticides))
+  filter(nbre_annee>7)  # 201 fields only after removing NA and fields with less than 7 years of samples
 
 summary(coleo_agri)
 
@@ -82,7 +81,7 @@ summary(n_plots)
 
 ```{r}
 prat <-  coleo_tot %>% 
-  select(1:20,TypeCulture,nbre_interv,CoefN,nbre_pesticides) %>% 
+  select(1:20,TypeCulture,nbre_interv,CoefN,nbre_pesticides,TypeCulture) %>% 
   filter(!is.na(nbre_pesticides),
          !is.na(nbre_interv),
          !is.na(CoefN)) %>% 
@@ -91,46 +90,160 @@ prat <-  coleo_tot %>%
   filter(nbre_annee>7)
 ```
 
-
 ### 2.2.1. Nombre interventions
-```{r}
-mod <- lmer(nbre_interv ~ annee + (1| id_parcelle), data=coleo_agri)
-plot(mod)
-qqmath(mod)
 
-summary(mod)
-Anova(mod)
+```{r}
+mod_compois <- glmmTMB(
+  nbre_interv ~ year_c + (1 | id_parcelle),
+  family = compois(link = "log"),
+  data = coleo_agri
+) # modèle Conway–Maxwell–Poisson (COM-Poisson), un modèle de Poisson modifié mais qui permet de modéliser une dispersion inférieure à celle attendue sous Poisson comme c'est le cas ici
+
+res_compois <- simulateResiduals(mod_compois)
+plot(res_compois)
+testDispersion(res_compois)
+testZeroInflation(res_compois)
+
+summary(mod_compois)
 ```
--0.26 ***
+ns
+
+```{r}
+coleo_agri_v <- coleo_agri |> 
+  filter(TypeCulture=="Vigne")
+mod_compois_v <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+   family = compois(link = "log"),
+  data = coleo_agri_v
+)
+summary(mod_compois_v)#ns
+
+coleo_agri_gc <- coleo_agri |> 
+  filter(TypeCulture=="GrandesCultures")
+mod_compois_gc <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+   family = compois(link = "log"),
+  data = coleo_agri_gc
+)
+summary(mod_compois_gc)#-0.02 ***
+
+coleo_agri_m <- coleo_agri |> 
+  filter(TypeCulture=="Maraichage")
+mod_compois_m <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+   family = compois(link = "log"),
+  data = coleo_agri_m
+)
+summary(mod_compois_m)#ns
+```
+
+
 
 ### 2.2.2. Fertilisation
+
 ```{r}
-mod <- lmer(CoefN ~ annee + (1| id_parcelle), data=coleo_agri)
-plot(mod)
-qqmath(mod)
+mod <- glmmTMB(
+  CoefN ~ year_c + (1 | id_parcelle),
+  family = gaussian(link = "identity"),
+  data = coleo_agri
+)
+res_N_gauss <- simulateResiduals(mod)
+plot(res_N_gauss)
+
+testUniformity(res_N_gauss)
+testDispersion(res_N_gauss)
+testOutliers(res_N_gauss, type = "bootstrap")
 
 summary(mod)
-Anova(mod)
 ```
--0.01 trend
+-1.73 *
+
+```{r}
+coleo_agri_v <- coleo_agri |> 
+  filter(TypeCulture=="Vigne")
+mod_v <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  data = coleo_agri_v
+)
+summary(mod_v)#ns
+
+coleo_agri_gc <- coleo_agri |> 
+  filter(TypeCulture=="GrandesCultures")
+mod_gc <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  data = coleo_agri_gc
+)
+summary(mod_gc)#-0.13 ***
+
+coleo_agri_m <- coleo_agri |> 
+  filter(TypeCulture=="Maraichage")
+mod_m <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  data = coleo_agri_m
+)
+summary(mod_m)#ns
+```
 
 ### 2.2.3. Nombre pesticides
-```{r}
-mod <- lmer(nbre_pesticides ~ annee + (1| id_parcelle), data=coleo_agri)
-plot(mod)
-qqmath(mod)
 
-summary(mod)
-Anova(mod)
+```{r}
+mod_nb <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri
+)
+
+sim_res <- simulateResiduals(mod_nb, n = 1000)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod_nb)
 ```
--0.3 ***
+-0.01 *, complètement drivé par les grandes cultures, voir ci-dessous car ns pour les 2 autres types de culture et -0.02 en vigne
+
+```{r}
+coleo_agri_v <- coleo_agri |> 
+  filter(TypeCulture=="Vigne")
+mod_nb_v <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_v
+)
+summary(mod_nb_v)#ns
+
+coleo_agri_gc <- coleo_agri |> 
+  filter(TypeCulture=="GrandesCultures")
+mod_nb_gc <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_gc
+)
+summary(mod_nb_gc)#-0.02 ***
+
+coleo_agri_m <- coleo_agri |> 
+  filter(TypeCulture=="Maraichage")
+mod_nb_m <- glmmTMB(
+  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_m
+)
+summary(mod_nb_m)#ns
+```
+
+
+DIMINUTION SIGNIF DE
+- NBRE D'INTERVENTIONS
+- QTITE FERTI
+- NBRE PESTICIDES 
+
+en grandes cultures uniquement, pas en vignes ni en maraîchage
 
 # 3. Whole dataset
 
 ## 3.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee  + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle), family=nbinom2, data=coleo_agri)
+mod <- glmmTMB(Bruches~ year_c  + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle), family=nbinom2, data=coleo_agri)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -139,13 +252,16 @@ testZeroInflation(sim_res)
 
 summary(mod)
 Anova(mod)
+r2(mod)
 ```
-annee 0.08 ***
+
+annee 0.08 \*\*\*
+nbre pest 0.02 *
 
 ## 3.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -160,7 +276,7 @@ ns
 ## 3.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -170,13 +286,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre interv -0.11 \* 
-nbre pesticides 0.14 \*\*
+
+nbre interv -0.11 \* nbre pesticides 0.14 \*\*
 
 ## 3.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -186,12 +302,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -201,12 +318,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-Coef N -0.08 **
+
+Coef N -0.08 \*\*
 
 ## 3.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -216,12 +334,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -231,12 +350,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -246,12 +366,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
+
+year_c 0.08 \*\*\*
 
 ## 3.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -262,12 +383,13 @@ overdisp_fun(mod) #still below 1
 summary(mod)
 Anova(mod)
 ```
-annee 0.18 \*\*\*
+
+year_c 0.18 \*\*\*
 
 ## 3.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -277,12 +399,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 nbre pesticides 0.11 \*\*
 
 ## 3.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -292,12 +415,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 3.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -307,12 +431,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 3.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -322,12 +447,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -337,12 +463,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -352,24 +479,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee + nbre_interv + CoefN + nbre_pesticides+  (1 | id_parcelle), data = coleo_agri)
+mod <- lmer(richesse_estimee ~ year_c + nbre_interv + CoefN + nbre_pesticides+  (1 | id_parcelle), data = coleo_agri)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.05 ***
+
+year_c 0.05 \*\*\*
 
 ## 3.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -379,7 +508,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.04 ***
+
+year_c 0.04 \*\*\*
 
 # 4. Annual crops dataset
 
@@ -391,7 +521,7 @@ coleo_agri_ann <- coleo_agri %>%
 ## 4.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee + (1| id_parcelle), family=nbinom2, data=coleo_agri_ann)
+mod <- glmmTMB(Bruches~ year_c + (1| id_parcelle), family=nbinom2, data=coleo_agri_ann)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -401,12 +531,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 4.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle), data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle), data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -416,12 +547,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 4.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -431,13 +563,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre interv -0.12 * 
-nbre_pesticides 0.19 ***
+
+nbre interv -0.12 \* nbre_pesticides 0.19 \*\*\*
 
 ## 4.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -447,12 +579,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-CoefN -0.13 *
+
+CoefN -0.13 \*
 
 ## 4.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -462,12 +595,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-Coef N -0.02 **
+
+Coef N -0.02 \*\*
 
 ## 4.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -477,12 +611,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.02 *
+
+year_c 0.02 \*
 
 ## 4.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -492,12 +627,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 4.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -507,12 +643,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
+
+year_c 0.08 \*\*\*
 
 ## 4.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri_ann$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(coleo_agri_ann$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -524,12 +661,13 @@ overdisp_fun(mod) #under 1
 summary(mod)
 Anova(mod)
 ```
-annee 0.17 \*\*\*
+
+year_c 0.17 \*\*\*
 
 ## 4.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -539,12 +677,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides 0.11 *
+
+nbre pesticides 0.11 \*
 
 ## 4.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -554,12 +693,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 **
+
+year_c 0.09 \*\*
 
 ## 4.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -569,12 +709,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.1 ***
+
+year_c 0.1 \*\*\*
 
 ## 4.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -584,12 +725,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 4.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -599,12 +741,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 4.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -614,24 +757,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 4.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle), data = coleo_agri_ann)
+mod <- lmer(richesse_estimee ~ year_c +  (1 | id_parcelle), data = coleo_agri_ann)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.54 ***
+
+year_c 0.54 \*\*\*
 
 ## 4.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -641,7 +786,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.04 ***
+
+year_c 0.04 \*\*\*
 
 # 5. Vineyards dataset
 
@@ -653,7 +799,7 @@ coleo_agri_vin <- coleo_agri %>%
 ## 5.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee + (1| id_parcelle), family=nbinom2, data=coleo_agri_vin)
+mod <- glmmTMB(Bruches~ year_c + (1| id_parcelle), family=nbinom2, data=coleo_agri_vin)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -663,12 +809,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.06 *
+
+year_c 0.06 \*
 
 ## 5.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -678,12 +825,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -693,12 +841,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 *
+
+year_c 0.08 \*
 
 ## 5.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -708,12 +857,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -723,12 +873,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -738,12 +889,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre interv -0.12 *
+
+nbre interv -0.12 \*
 
 ## 5.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -753,12 +905,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.04 *
+
+year_c 0.04 \*
 
 ## 5.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -768,12 +921,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.06 *
+
+year_c 0.06 \*
 
 ## 5.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri_vin$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(coleo_agri_vin$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -783,12 +937,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.21 ***
+
+year_c 0.21 \*\*\*
 
 ## 5.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -798,12 +953,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -813,14 +969,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 *
-nbre interv -0.21 * 
-CoefN 0.25 **
+
+year_c 0.08 *nbre interv -0.21* CoefN 0.25 \*\*
 
 ## 5.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -830,12 +985,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.06 *
+
+year_c 0.06 \*
 
 ## 5.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -845,12 +1001,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 *
+
+year_c 0.09 \*
 
 ## 5.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -860,12 +1017,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -875,24 +1033,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 5.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee+ nbre_interv + CoefN + nbre_pesticides+(1 | id_parcelle), data = coleo_agri_vin)
+mod <- lmer(richesse_estimee ~ year_c+ nbre_interv + CoefN + nbre_pesticides+(1 | id_parcelle), data = coleo_agri_vin)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.39 **
+
+year_c 0.39 \*\*
 
 ## 5.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -902,6 +1062,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 # 6. Whole dataset - just year
@@ -909,7 +1070,7 @@ ns
 ## 6.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee + (1| id_parcelle), family=nbinom2, data=coleo_agri)
+mod <- glmmTMB(Bruches~ year_c + (1| id_parcelle), family=nbinom2, data=coleo_agri)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -919,12 +1080,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.07 ***
+
+year_c 0.07 \*\*\*
 
 ## 6.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -934,12 +1096,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -949,12 +1112,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -964,12 +1128,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
--0.04 *
+
+-0.04 \*
 
 ## 6.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -979,12 +1144,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -994,12 +1160,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1009,12 +1176,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1024,12 +1192,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.05 ***
+
+year_c 0.05 \*\*\*
 
 ## 6.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1040,12 +1209,13 @@ overdisp_fun(mod) #still below 1
 summary(mod)
 Anova(mod)
 ```
-annee 0.2 ***
+
+year_c 0.2 \*\*\*
 
 ## 6.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1055,12 +1225,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1070,12 +1241,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
+
+year_c 0.08 \*\*\*
 
 ## 6.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1085,12 +1257,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 6.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1100,12 +1273,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1115,12 +1289,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-0.03 *
+
+0.03 \*
 
 ## 6.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1130,6 +1305,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 6.16. Richesse
@@ -1137,19 +1313,20 @@ ns
 ```{r}
 richesse <- coleo_agri %>% 
   filter(!is.na(richesse_estimee))
-mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle), data = richesse)
+mod <- lmer(richesse_estimee ~ year_c +  (1 | id_parcelle), data = richesse)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.39 ***
+
+year_c 0.39 \*\*\*
 
 ## 6.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c +  (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1159,7 +1336,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.03 ***
+
+year_c 0.03 \*\*\*
 
 # 7. Annual crops dataset - just year
 
@@ -1171,7 +1349,7 @@ coleo_agri_ann <- coleo_agri %>%
 ## 7.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee + (1| id_parcelle), family=nbinom2, data=coleo_agri_ann)
+mod <- glmmTMB(Bruches~ year_c + (1| id_parcelle), family=nbinom2, data=coleo_agri_ann)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1181,12 +1359,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
+
+year_c 0.08 \*\*\*
 
 ## 7.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + (1| id_parcelle), data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + (1| id_parcelle), data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1196,12 +1375,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1211,12 +1391,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1226,12 +1407,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1241,12 +1423,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1256,12 +1439,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.02 *
+
+year_c 0.02 \*
 
 ## 7.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1271,12 +1455,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1286,12 +1471,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.05 ***
+
+year_c 0.05 \*\*\*
 
 ## 7.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri_ann$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(coleo_agri_ann$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1303,12 +1489,13 @@ overdisp_fun(mod) #under 1
 summary(mod)
 Anova(mod)
 ```
-annee 0.18 \*\*\*
+
+year_c 0.18 \*\*\*
 
 ## 7.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1318,12 +1505,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1333,12 +1521,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 7.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1348,12 +1537,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.11 ***
+
+year_c 0.11 \*\*\*
 
 ## 7.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1363,12 +1553,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1378,12 +1569,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-0.03 *
+
+0.03 \*
 
 ## 7.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1393,24 +1585,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 7.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle), data = coleo_agri_ann)
+mod <- lmer(richesse_estimee ~ year_c +  (1 | id_parcelle), data = coleo_agri_ann)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.47 ***
+
+year_c 0.47 \*\*\*
 
 ## 7.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + (1| id_parcelle)  , data=coleo_agri_ann, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1420,7 +1614,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.04 ***
+
+year_c 0.04 \*\*\*
 
 # 8. Vineyards dataset - just year
 
@@ -1432,7 +1627,7 @@ coleo_agri_vin <- coleo_agri %>%
 ## 8.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee + (1| id_parcelle), family=nbinom2, data=coleo_agri_vin)
+mod <- glmmTMB(Bruches~ year_c + (1| id_parcelle), family=nbinom2, data=coleo_agri_vin)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1442,12 +1637,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.06 *
+
+year_c 0.06 \*
 
 ## 8.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1457,12 +1653,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1472,12 +1669,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.07 *
+
+year_c 0.07 \*
 
 ## 8.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1487,12 +1685,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1502,12 +1701,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1517,12 +1717,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1532,12 +1733,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.05 **
+
+year_c 0.05 \*\*
 
 ## 8.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1547,12 +1749,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri_vin$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(coleo_agri_vin$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1562,12 +1765,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.24 ***
+
+year_c 0.24 \*\*\*
 
 ## 8.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1577,12 +1781,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1592,12 +1797,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.07 *
+
+year_c 0.07 \*
 
 ## 8.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1607,12 +1813,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1622,12 +1829,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1637,12 +1845,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1652,24 +1861,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee +  (1 | id_parcelle), data = coleo_agri_vin)
+mod <- lmer(richesse_estimee ~ year_c +  (1 | id_parcelle), data = coleo_agri_vin)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 8.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + (1| id_parcelle)  , data=coleo_agri_vin, family=nbinom2)
 
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1679,6 +1890,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 # 9. Whole dataset - crop type effect
@@ -1688,11 +1900,10 @@ coleo_agri <- coleo_agri %>%
   mutate(crop_type=ifelse(TypeCulture == "Vigne","vineyard","annual_crop"))
 ```
 
-
 ## 9.1. Bruches
 
 ```{r}
-mod <- glmmTMB(Bruches~ annee  + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle), family=nbinom2, data=coleo_agri)
+mod <- glmmTMB(Bruches~ year_c  + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle), family=nbinom2, data=coleo_agri)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1702,13 +1913,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
-vignes 1.1 ***
+
+year_c 0.08 ***vignes 1.1***
 
 ## 9.2. Buprestes
 
 ```{r}
-mod <- glmmTMB(Buprestes~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Buprestes~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1718,12 +1929,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 9.3. Cantharides
 
 ```{r}
-mod <- glmmTMB(Cantharides~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Cantharides~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1733,14 +1945,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre interv -0.11 \* 
-nbre pesticides 0.13 \*\*
-vignes -1.26 ***
+
+nbre interv -0.11 \* nbre pesticides 0.13 \*\* vignes -1.26 \*\*\*
 
 ## 9.4. Carabiques
 
 ```{r}
-mod <- glmmTMB(Carabiques~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Carabiques~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1750,12 +1961,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-vignes : -1.22 ***
+
+vignes : -1.22 \*\*\*
 
 ## 9.5. Charançons
 
 ```{r}
-mod <- glmmTMB(Charançons~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Charançons~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1765,13 +1977,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-Coef N -0.08 **
-vignes 0.29 *
+
+Coef N -0.08 \*\* vignes 0.29 \*
 
 ## 9.6. Chrysomèles
 
 ```{r}
-mod <- glmmTMB(Chrysomèles~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Chrysomèles~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1781,12 +1993,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-vignes -0.48 ***
+
+vignes -0.48 \*\*\*
 
 ## 9.7. Coccinelles
 
 ```{r}
-mod <- glmmTMB(Coccinelles~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Coccinelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1796,12 +2009,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 9.8. Divers
 
 ```{r}
-mod <- glmmTMB(Divers~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Divers~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1811,12 +2025,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.08 ***
+
+year_c 0.08 \*\*\*
 
 ## 9.9. Divers - petits coléoptères avec antennes en massues
 
 ```{r}
-mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(coleo_agri$"Divers..Petits.coléoptères.avec.antennes.en.massues" ~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1827,13 +2042,13 @@ overdisp_fun(mod) #still below 1
 summary(mod)
 Anova(mod)
 ```
-annee 0.18 \*\*\*
-vignes -1.8 ***
+
+year_c 0.18 \*\*\* vignes -1.8 \*\*\*
 
 ## 9.10. Elatéridés
 
 ```{r}
-mod <- glmmTMB(Elatéridés~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Elatéridés~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1843,12 +2058,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 nbre pesticides 0.11 \*\*
 
 ## 9.11. Longicornes
 
 ```{r}
-mod <- glmmTMB(Longicornes~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Longicornes~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1858,13 +2074,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
-vignes 0.98 **
+
+year_c 0.09 \* **vignes 0.98**
 
 ## 9.12. Malachites
 
 ```{r}
-mod <- glmmTMB(Malachites~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Malachites~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1874,12 +2090,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.09 ***
+
+year_c 0.09 \*\*\*
 
 ## 9.13. Mordelles
 
 ```{r}
-mod <- glmmTMB(Mordelles~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Mordelles~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1889,12 +2106,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-vignes 0.64 *
+
+vignes 0.64 \*
 
 ## 9.14. Oedémérides
 
 ```{r}
-mod <- glmmTMB(Oedémérides~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Oedémérides~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1904,12 +2122,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 9.15. Staphylins
 
 ```{r}
-mod <- glmmTMB(Staphylins~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(Staphylins~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1919,24 +2138,26 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-vignes -1.14 ***
+
+vignes -1.14 \*\*\*
 
 ## 9.16. Richesse
 
 ```{r}
-mod <- lmer(richesse_estimee ~ annee + nbre_interv + CoefN + nbre_pesticides+  (1 | id_parcelle), data = coleo_agri)
+mod <- lmer(richesse_estimee ~ year_c + nbre_interv + CoefN + nbre_pesticides+  (1 | id_parcelle), data = coleo_agri)
 plot(mod)
 qqmath(mod)
 
 summary(mod)
 Anova(mod)
 ```
-annee 0.05 ***
+
+year_c 0.05 \*\*\*
 
 ## 9.17. Abondance
 
 ```{r}
-mod <- glmmTMB(ab_tot~ annee + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
+mod <- glmmTMB(ab_tot~ year_c + nbre_interv + CoefN + nbre_pesticides+ crop_type + (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
 check_collinearity(mod)
 sim_res <- simulateResiduals(mod, n = 1000)
 plot(sim_res)
@@ -1946,12 +2167,13 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.04 ***
-vignes -0.25 *
 
-# 10. Impact on traits 
+year_c 0.04 \*\* *vignes -0.25*
+
+# 10. Impact on traits
 
 ## 10.1. Predators
+
 ```{r}
 mod <- glmmTMB(predat ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
 
@@ -1963,8 +2185,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre pest 0.07 *
-vignes -0.66 ***
+
+nbre pest 0.07 *vignes -0.66* \*\*
 
 ```{r}
 mod <- glmmTMB(not_predator ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
@@ -1977,6 +2199,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ```{r}
@@ -1996,9 +2219,11 @@ AIC(mod,mod2) #keep mod
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides 0.07 **
+
+nbre pesticides 0.07 \*\*
 
 ## 10.2. Pests
+
 ```{r}
 mod <- glmmTMB(mostly_pest ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
 
@@ -2012,7 +2237,8 @@ overdisp_fun(mod)
 summary(mod)
 Anova(mod)
 ```
-vignes -0.29 *
+
+vignes -0.29 \*
 
 ```{r}
 mod <- glmmTMB(mostly_not_pest ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
@@ -2025,6 +2251,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ```{r}
@@ -2044,11 +2271,11 @@ AIC(mod,mod2) #keep mod
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides 0.06 **
-vignes -0.34 *
 
+nbre pesticides 0.06 \*\* vignes -0.34 \*
 
 ## 10.3. Flower visitors
+
 ```{r}
 mod <- glmmTMB(flovis ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
 
@@ -2060,7 +2287,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-vignes -0.5 ***
+
+vignes -0.5 \*\*\*
 
 ```{r}
 mod <- glmmTMB(not_flovis ~  nbre_interv + CoefN + nbre_pesticides+ crop_type + (1 | id_parcelle), family = nbinom2, data = coleo_agri)
@@ -2073,6 +2301,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ```{r}
@@ -2086,4 +2315,5 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides 0.07 *
+
+nbre pesticides 0.07 \*
