@@ -39,9 +39,7 @@ coleo_tot <- coleo %>%
   relocate(id_uniq) %>% 
   select(-year)
 
-coleo_agri$year_c <- as.numeric(
-  scale(coleo_agri$annee, center = TRUE, scale = FALSE)
-)
+
 
 overdisp_fun <- function(model) {
   rdf <- df.residual(model)
@@ -69,6 +67,10 @@ coleo_agri <- coleo_tot %>%
   filter(nbre_annee>7)  # 201 fields only after removing NA and fields with less than 7 years of samples
 
 summary(coleo_agri)
+coleo_agri$year_c <- as.numeric(
+  scale(coleo_agri$annee, center = TRUE, scale = FALSE)
+)
+
 
 n_plots <- coleo_agri %>% 
   select(id_parcelle,TypeCulture) %>% 
@@ -106,13 +108,14 @@ testZeroInflation(res_compois)
 
 summary(mod_compois)
 ```
+
 ns
 
 ```{r}
 coleo_agri_v <- coleo_agri |> 
   filter(TypeCulture=="Vigne")
 mod_compois_v <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  nbre_interv ~ year_c + (1 | id_parcelle),
    family = compois(link = "log"),
   data = coleo_agri_v
 )
@@ -121,23 +124,21 @@ summary(mod_compois_v)#ns
 coleo_agri_gc <- coleo_agri |> 
   filter(TypeCulture=="GrandesCultures")
 mod_compois_gc <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  nbre_interv ~ year_c + (1 | id_parcelle),
    family = compois(link = "log"),
   data = coleo_agri_gc
 )
-summary(mod_compois_gc)#-0.02 ***
+summary(mod_compois_gc)#ns
 
 coleo_agri_m <- coleo_agri |> 
   filter(TypeCulture=="Maraichage")
 mod_compois_m <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  nbre_interv ~ year_c + (1 | id_parcelle),
    family = compois(link = "log"),
   data = coleo_agri_m
 )
 summary(mod_compois_m)#ns
 ```
-
-
 
 ### 2.2.2. Fertilisation
 
@@ -156,13 +157,14 @@ testOutliers(res_N_gauss, type = "bootstrap")
 
 summary(mod)
 ```
--1.73 *
+
+-1.73 \*
 
 ```{r}
 coleo_agri_v <- coleo_agri |> 
   filter(TypeCulture=="Vigne")
 mod_v <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  CoefN ~ year_c + (1 | id_parcelle),
   data = coleo_agri_v
 )
 summary(mod_v)#ns
@@ -170,18 +172,18 @@ summary(mod_v)#ns
 coleo_agri_gc <- coleo_agri |> 
   filter(TypeCulture=="GrandesCultures")
 mod_gc <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  CoefN ~ year_c + (1 | id_parcelle),
   data = coleo_agri_gc
 )
-summary(mod_gc)#-0.13 ***
+summary(mod_gc)#-2.22 *
 
 coleo_agri_m <- coleo_agri |> 
   filter(TypeCulture=="Maraichage")
 mod_m <- glmmTMB(
-  nbre_pesticides ~ year_c + (1 | id_parcelle),
+  CoefN ~ year_c + (1 | id_parcelle),
   data = coleo_agri_m
 )
-summary(mod_m)#ns
+summary(mod_m)#-7.57 **
 ```
 
 ### 2.2.3. Nombre pesticides
@@ -199,7 +201,8 @@ testZeroInflation(sim_res)
 
 summary(mod_nb)
 ```
--0.01 *, complètement drivé par les grandes cultures, voir ci-dessous car ns pour les 2 autres types de culture et -0.02 en vigne
+
+-0.01 \*, complètement drivé par les grandes cultures, voir ci-dessous car ns pour les 2 autres types de culture et -0.02 en vigne
 
 ```{r}
 coleo_agri_v <- coleo_agri |> 
@@ -230,13 +233,9 @@ mod_nb_m <- glmmTMB(
 summary(mod_nb_m)#ns
 ```
 
+DIMINUTION SIGNIF DE - QTITE FERTI (grandes cultures, maraîchage) - NBRE PESTICIDES (grandes cultures)
 
-DIMINUTION SIGNIF DE
-- NBRE D'INTERVENTIONS
-- QTITE FERTI
-- NBRE PESTICIDES 
-
-en grandes cultures uniquement, pas en vignes ni en maraîchage
+Pas de changement pour le nbre d'interventions ni pour la vigne
 
 # 3. Whole dataset
 
@@ -255,8 +254,7 @@ Anova(mod)
 r2(mod)
 ```
 
-annee 0.08 \*\*\*
-nbre pest 0.02 *
+annee 0.08 \*\*\* nbre pest 0.02 \*
 
 ## 3.2. Buprestes
 
@@ -271,6 +269,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.3. Cantharides
