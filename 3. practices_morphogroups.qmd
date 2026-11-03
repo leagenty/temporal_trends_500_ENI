@@ -286,7 +286,8 @@ summary(mod)
 Anova(mod)
 ```
 
-nbre interv -0.11 \* nbre pesticides 0.14 \*\*
+nbre interv -0.14 ** 
+CoefN 0.001 **
 
 ## 3.4. Carabiques
 
@@ -301,8 +302,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-
-ns
+année -0.04 *
 
 ## 3.5. Charançons
 
@@ -318,7 +318,8 @@ summary(mod)
 Anova(mod)
 ```
 
-Coef N -0.08 \*\*
+Coef N -0.001 ***
+Nbre pesticides 0.01 trend
 
 ## 3.6. Chrysomèles
 
@@ -333,8 +334,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-
-ns
+Annee 0.01 trend
+Nbre pesticides -0.009 *
 
 ## 3.7. Coccinelles
 
@@ -383,7 +384,7 @@ summary(mod)
 Anova(mod)
 ```
 
-year_c 0.18 \*\*\*
+year_c 0.2 \*\*\*
 
 ## 3.10. Elatéridés
 
@@ -398,8 +399,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-
-nbre pesticides 0.11 \*\*
+ns
 
 ## 3.11. Longicornes
 
@@ -416,6 +416,9 @@ Anova(mod)
 ```
 
 year_c 0.09 \*\*\*
+nbre interv -0.24 **
+Coef N -0.001 *
+Nbre pest 0.03 *
 
 ## 3.12. Malachites
 
@@ -432,6 +435,7 @@ Anova(mod)
 ```
 
 year_c 0.09 \*\*\*
+CoefN -0.001 *
 
 ## 3.13. Mordelles
 
@@ -446,8 +450,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-
-ns
+nbre pesticides 0.03 *
 
 ## 3.14. Oedémérides
 
@@ -462,8 +465,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-
-ns
+annee 0.02 *
+Nbre interv -0.14 **
 
 ## 3.15. Staphylins
 
@@ -478,23 +481,10 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+nbre pesticides -0.03 **
 
-ns
 
-## 3.16. Richesse
-
-```{r}
-mod <- lmer(richesse_estimee ~ year_c + nbre_interv + CoefN + nbre_pesticides+  (1 | id_parcelle), data = coleo_agri)
-plot(mod)
-qqmath(mod)
-
-summary(mod)
-Anova(mod)
-```
-
-year_c 0.05 \*\*\*
-
-## 3.17. Abondance
+## 3.16. Abondance
 
 ```{r}
 mod <- glmmTMB(ab_tot~ year_c + nbre_interv + CoefN + nbre_pesticides+ (1| id_parcelle)  , data=coleo_agri, family=nbinom2)
@@ -508,7 +498,7 @@ summary(mod)
 Anova(mod)
 ```
 
-year_c 0.04 \*\*\*
+year_c 0.03 \*\*\*
 
 # 4. Annual crops dataset
 

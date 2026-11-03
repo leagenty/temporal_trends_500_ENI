@@ -300,7 +300,7 @@ testZeroInflation(sim_res)
 summary(mod)
 ```
 
-nbre pesticides 0.025 \*
+nbre pesticides 0.023 \*
 
 ## 3.12. Abundance
 
@@ -315,7 +315,7 @@ testZeroInflation(sim_res)
 summary(mod)
 ```
 
-nbre pesticides 0.04 \*\*
+nbre pesticides 0.03 \*\*
 
 # 4. Annual crops
 
