@@ -16,11 +16,8 @@ library(DHARMa)
 library(glmmTMB)
 library(car)
 library(lattice)
-library(broom.mixed) 
-library(ggpubr)
 library(lme4)
 library(car)
-library(MuMIn)
 select <- dplyr::select
 
 agri <- read.csv("3.practices_morphogroups/input/agro_data_per_field_and_year.csv") %>% 
@@ -58,10 +55,12 @@ overdisp_fun <- function(model) {
 
 ```{r}
 coleo_agri <- coleo_tot %>% 
-  select(1:29,TypeCulture,nbre_interv,CoefN,nbre_pesticides) %>% 
+  select(1:29,TypeCulture,nbre_interv,CoefN,nbre_pesticides,nbre_herbicides,nbre_insecticides) %>% 
   filter(!is.na(nbre_pesticides),
          !is.na(nbre_interv),
-         !is.na(CoefN)) %>% 
+         !is.na(CoefN),
+         !is.na(nbre_herbicides),
+         !is.na(nbre_insecticides)) %>% 
   group_by(id_parcelle) %>% 
   mutate(nbre_annee= n_distinct(annee)) %>% 
   filter(nbre_annee>7)  # 201 fields only after removing NA and fields with less than 7 years of samples
@@ -81,16 +80,6 @@ summary(n_plots)
 
 ## 2.2. Temporal trends of practices
 
-```{r}
-prat <-  coleo_tot %>% 
-  select(1:20,TypeCulture,nbre_interv,CoefN,nbre_pesticides,TypeCulture) %>% 
-  filter(!is.na(nbre_pesticides),
-         !is.na(nbre_interv),
-         !is.na(CoefN)) %>% 
-  group_by(id_parcelle) %>% 
-  mutate(nbre_annee= n_distinct(annee)) %>% 
-  filter(nbre_annee>7)
-```
 
 ### 2.2.1. Nombre interventions
 
@@ -233,9 +222,104 @@ mod_nb_m <- glmmTMB(
 summary(mod_nb_m)#ns
 ```
 
-DIMINUTION SIGNIF DE - QTITE FERTI (grandes cultures, maraîchage) - NBRE PESTICIDES (grandes cultures)
+### 2.2.4. Nombre herbicides
 
-Pas de changement pour le nbre d'interventions ni pour la vigne
+```{r}
+mod_nb <- glmmTMB(
+  nbre_herbicides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri
+)
+
+sim_res <- simulateResiduals(mod_nb, n = 1000)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod_nb)
+```
+
+-0.03 ***
+
+
+```{r}
+coleo_agri_v <- coleo_agri |> 
+  filter(TypeCulture=="Vigne")
+mod_nb_v <- glmmTMB(
+  nbre_herbicides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_v 
+)
+summary(mod_nb_v)# -0.07
+
+coleo_agri_gc <- coleo_agri |> 
+  filter(TypeCulture=="GrandesCultures")
+mod_nb_gc <- glmmTMB(
+  nbre_herbicides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_gc
+)
+summary(mod_nb_gc)#-0.03 ***
+
+coleo_agri_m <- coleo_agri |> 
+  filter(TypeCulture=="Maraichage")
+mod_nb_m <- glmmTMB(
+  nbre_herbicides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_m
+)
+summary(mod_nb_m)#ns
+```
+
+diminution vignes et  grandes cultures
+
+### 2.2.5. Nbre insecticides 
+
+```{r}
+mod_nb <- glmmTMB(
+  nbre_insecticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri
+)
+
+sim_res <- simulateResiduals(mod_nb, n = 1000)
+testDispersion(sim_res)
+testZeroInflation(sim_res) 
+
+summary(mod_nb)
+```
+ns
+
+
+```{r}
+coleo_agri_v <- coleo_agri |> 
+  filter(TypeCulture=="Vigne")
+mod_nb_v <- glmmTMB(
+  nbre_insecticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_v 
+)
+summary(mod_nb_v)# -0.04 *
+
+coleo_agri_gc <- coleo_agri |> 
+  filter(TypeCulture=="GrandesCultures")
+mod_nb_gc <- glmmTMB(
+  nbre_insecticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_gc
+)
+summary(mod_nb_gc)#ns
+
+coleo_agri_m <- coleo_agri |> 
+  filter(TypeCulture=="Maraichage")
+mod_nb_m <- glmmTMB(
+  nbre_insecticides ~ year_c + (1 | id_parcelle),
+  family = nbinom1,
+  data = coleo_agri_m
+)
+summary(mod_nb_m)#trend -0.06
+```
+
+diminution vignes et maraîchage
 
 # 3. Whole dataset
 
@@ -286,8 +370,7 @@ summary(mod)
 Anova(mod)
 ```
 
-nbre interv -0.14 ** 
-CoefN 0.001 **
+nbre interv -0.14 \*\* CoefN 0.001 \*\*
 
 ## 3.4. Carabiques
 
@@ -302,7 +385,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-année -0.04 *
+
+année -0.04 \*
 
 ## 3.5. Charançons
 
@@ -318,8 +402,7 @@ summary(mod)
 Anova(mod)
 ```
 
-Coef N -0.001 ***
-Nbre pesticides 0.01 trend
+Coef N -0.001 \*\*\* Nbre pesticides 0.01 trend
 
 ## 3.6. Chrysomèles
 
@@ -334,8 +417,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-Annee 0.01 trend
-Nbre pesticides -0.009 *
+
+Annee 0.01 trend Nbre pesticides -0.009 \*
 
 ## 3.7. Coccinelles
 
@@ -399,6 +482,7 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
+
 ns
 
 ## 3.11. Longicornes
@@ -415,10 +499,7 @@ summary(mod)
 Anova(mod)
 ```
 
-year_c 0.09 \*\*\*
-nbre interv -0.24 **
-Coef N -0.001 *
-Nbre pest 0.03 *
+year_c 0.09 \*\*\* nbre interv -0.24 \*\* Coef N -0.001 *Nbre pest 0.03*
 
 ## 3.12. Malachites
 
@@ -434,8 +515,7 @@ summary(mod)
 Anova(mod)
 ```
 
-year_c 0.09 \*\*\*
-CoefN -0.001 *
+year_c 0.09 \*\*\* CoefN -0.001 \*
 
 ## 3.13. Mordelles
 
@@ -450,7 +530,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides 0.03 *
+
+nbre pesticides 0.03 \*
 
 ## 3.14. Oedémérides
 
@@ -465,8 +546,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-annee 0.02 *
-Nbre interv -0.14 **
+
+annee 0.02 \* Nbre interv -0.14 \*\*
 
 ## 3.15. Staphylins
 
@@ -481,8 +562,8 @@ testZeroInflation(sim_res)
 summary(mod)
 Anova(mod)
 ```
-nbre pesticides -0.03 **
 
+nbre pesticides -0.03 \*\*
 
 ## 3.16. Abondance
 

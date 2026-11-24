@@ -415,7 +415,6 @@ ggplot(coleo_year, aes(x = factor(annee), y = log1p(Chrysomèles))) +
   )
 ```
 
-
 ## 3.7. Coccinelles
 
 ```{r}
@@ -560,7 +559,7 @@ r2(mod)
 
 0.017 \*\*\* 0.112 \*\*\*
 
-## 4.2. Abundance
+## 3.16. Abundance
 
 ```{r}
 mod <- glmmTMB(ab_tot ~ annee +  (1 | id_parcelle),  data = coleo_year,family=nbinom2)
@@ -574,6 +573,132 @@ summary(mod)
 ```
 
 ns 0.034 \*\*\* annee disp
+
+
+## 3.16. Graph des moyennes
+```{r}
+coleo_year <- coleo_year |> 
+  filter(annee>2012&annee<2025)
+
+ggplot(coleo_year, aes(annee, Longicornes)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 2)) +
+  labs(x = "Year", y = "Mean longhorn beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Mordelles)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 2)) +
+  labs(x = "Year", y = "Mean tumbling flower beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Oedémérides)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(1, 5)) +
+  labs(x = "Year", y = "Mean false blister beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Bruches)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 8)) +
+  labs(x = "Year", y = "Mean seed beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Malachites)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(2, 6)) +
+  labs(x = "Year", y = "Mean soft-wing flower beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, coleo_year$"Divers..Petits.coléoptères.avec.antennes.en.massues")) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(2, 50)) +
+  labs(x = "Year", y = "Mean sap beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Carabiques)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 2)) +
+  labs(x = "Year", y = "Mean ground beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Charançons)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(12, 26)) +
+  labs(x = "Year", y = "Mean weevils abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(coleo_year, aes(annee, Chrysomèles)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(15, 35)) +
+  labs(x = "Year", y = "Mean leaf beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+```
+
 
 # 5. Per crop type
 

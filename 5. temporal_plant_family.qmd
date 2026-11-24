@@ -49,6 +49,13 @@ plots_plus_sept <- plants_tot %>%
 plants_year <- plants_tot %>% 
   filter(id_parcelle %in% plots_plus_sept$id_parcelle)
 #write.csv(plants_year,file="5.temporal_plant_family/output/plants_year.csv")
+
+plants_means <- plants_year %>%
+  group_by(year) %>%
+  summarise(across(where(is.numeric) & !id_parcelle,
+                   ~ mean(.x, na.rm = TRUE)))
+#write.csv(plants_means,file="5.temporal_plant_family/output/plants_means.csv")
+plot(plants_means$year,plants_means$Poaceae)
 ```
 
 # 2. Dynamic of abundance of each family
@@ -86,7 +93,7 @@ r2(mod)
 0.008 \*\*\*
 
 ```{r}
-ggplot(plants_year2, aes(x = factor(year), y = Poaceae)) +
+ggplot(plants_year, aes(x = factor(year), y = Poaceae)) +
   geom_jitter(alpha=0.1) +
   geom_boxplot(fill="darkolivegreen4", alpha = 0.6) +
   labs(
@@ -97,6 +104,10 @@ ggplot(plants_year2, aes(x = factor(year), y = Poaceae)) +
   theme(
     legend.position = "none"
   )
+
+
+
+  
 ```
 
 ## 2.2. Asteraceae
@@ -173,6 +184,10 @@ ggplot(plants_year2, aes(x = factor(year), y = Fabaceae)) +
   theme(
     legend.position = "none"
   )
+
+
+
+  
 ```
 
 ## 2.4. Plantaginaceae
@@ -212,6 +227,9 @@ ggplot(plants_year2, aes(x = factor(year), y = Plantaginaceae)) +
   theme(
     legend.position = "none"
   )
+
+
+
 ```
 
 ## 2.5. Convolvulaceae
@@ -252,6 +270,7 @@ ggplot(plants_year2, aes(x = factor(year), y = Convolvulaceae)) +
   theme(
     legend.position = "none"
   )
+
 ```
 
 ## 2.6. Rosaceae
@@ -292,6 +311,9 @@ ggplot(plants_year2, aes(x = factor(year), y = Rosaceae)) +
   theme(
     legend.position = "none"
   )
+
+
+
 ```
 
 ## 2.7. Geraniaceae
@@ -331,6 +353,8 @@ ggplot(plants_year2, aes(x = factor(year), y = Geraniaceae)) +
   theme(
     legend.position = "none"
   )
+
+
 ```
 
 ## 2.8. Apiaceae
@@ -408,6 +432,8 @@ ggplot(plants_year2, aes(x = factor(year), y = Polygonaceae)) +
   theme(
     legend.position = "none"
   )
+
+
 ```
 
 ## 2.10. Rubiaceae
@@ -468,7 +494,7 @@ print(r2_res, digits = 4)
 ```{r}
 ggplot(plants_year2, aes(x = factor(year), y = richness)) +
   geom_jitter(alpha=0.1) +
-  geom_boxplot(fill="orange2", alpha = 0.6) +
+  geom_boxplot(fill="firebrick3", alpha = 0.6) +
   labs(
     x = "Year",
     y = "Plant richness"
@@ -477,6 +503,8 @@ ggplot(plants_year2, aes(x = factor(year), y = richness)) +
   theme(
     legend.position = "none"
   ) 
+
+
 ```
 
 ## 2.12. Abundance
@@ -495,19 +523,131 @@ r2(mod)
 
 0.004 \*\*
 
+## 2.13. Graph des moyennes
 ```{r}
-ggplot(plants_year2, aes(x = factor(year), y = abundance)) +
-  geom_jitter(alpha=0.1) +
-  geom_boxplot(fill="mistyrose2", alpha = 0.6) +
-  labs(
-    x = "Year",
-    y = "Plant abundance"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "none"
-  ) 
+ggplot(plants_year, aes(year, Poaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(22, 33)) +
+  labs(x = "Year", y = "Mean Poaceae abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(plants_year, aes(year, Fabaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(3, 8)) +
+  labs(x = "Year", y = "Mean Fabaceae abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+
+ggplot(plants_year, aes(year, Geraniaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(1, 5)) +
+  labs(x = "Year", y = "Mean Geraniaceae abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(plants_year, aes(year, Plantaginaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(3, 7)) +
+  labs(x = "Year", y = "Mean Plantaginaceae abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+
+ggplot(plants_year, aes(year, Convolvulaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(3, 5)) +
+  labs(x = "Year", y = "Mean Convolvulaceae abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(plants_year, aes(year, Rosaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(2, 5)) +
+  labs(x = "Year", y = "Mean Rosaceae abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+
+ggplot(plants_year, aes(year, Polygonaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(1, 4)) +
+  labs(x = "Year", y = "Mean Polygonaceae abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+ggplot(plants_year, aes(year, richness)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(15, 20)) +
+  labs(x = "Year", y = "Mean plant richness") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+
+
+ggplot(plants_year, aes(year, abundance)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(60, 80)) +
+  labs(x = "Year", y = "Mean plant abundance") +
+  theme_minimal()+ 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
 ```
+
+
 
 # 3. Per crop type
 

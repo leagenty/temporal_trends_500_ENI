@@ -282,6 +282,12 @@ coleo_year <- read.csv("7.clusters_intensity_practices/input/coleo_year.csv") %>
   mutate(id_parcelle=as.character(id_parcelle)) %>% 
   left_join(clust)
 
+coleo_year1 <- coleo_year  |> 
+  filter(clust==1)
+
+coleo_year2 <- coleo_year |> 
+  filter(clust==2)
+
 plants_year$year <- plants_year$year - mean(plants_year$year)
 coleo_year$year <- coleo_year$year - mean(coleo_year$year)
 
@@ -366,6 +372,23 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
         axis.title=element_text(size=16))+ 
   theme_graphique
 ```
+
+
+```{r}
+ggplot(coleo_year2, aes(year, Cantharides)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 8)) +
+  labs(x = "Year", y = "Mean soldier beetles abundance (clust 2)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 
 ### 5.1.4. Carabiques
 
@@ -486,6 +509,23 @@ ggplot(coleo_year2, aes(x = factor(year), y = log1p(Chrysomèles))) +
 ```
 
 
+
+```{r}
+ggplot(coleo_year1, aes(year, Chrysomèles)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(12, 35)) +
+  labs(x = "Year", y = "Mean leaf beetles abundance (clust 1)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
+
 ### 5.1.7. Coccinelles
 
 ```{r}
@@ -531,6 +571,22 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
         axis.title=element_text(size=16))+ 
   theme_graphique
 ```
+
+```{r}
+ggplot(coleo_year2, aes(year, Coccinelles)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(0, 10)) +
+  labs(x = "Year", y = "Mean ladybugs abundance (clust 2)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 
 ### 5.1.8. Divers
 
@@ -708,6 +764,21 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
   theme_graphique
 ```
 
+```{r}
+ggplot(coleo_year1, aes(year, ab_tot)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(50, 155)) +
+  labs(x = "Year", y = "Mean beetles abundance (clust 1)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 ### 5.1.17. Predators
 
 ```{r}
@@ -724,6 +795,21 @@ Anova(mod)
 
 year\*\*\* cluster \*\*\*
 
+```{r}
+ggplot(coleo_year, aes(year, predat)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(5, 15)) +
+  labs(x = "Year", y = "Mean predator beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 ### 5.1.18. Flower visitors
 
 ```{r}
@@ -739,6 +825,22 @@ Anova(mod)
 ```
 
 ns
+
+```{r}
+ggplot(coleo_year, aes(year, flovis)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(10, 60)) +
+  labs(x = "Year", y = "Mean flower-visiting beetles abundance") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 
 ### 5.1.19. Pests
 
@@ -786,11 +888,32 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
   theme_graphique
 ```
 
+```{r}
+ggplot(coleo_year1, aes(year, mostly_pest)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "goldenrod4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "goldenrod4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "goldenrod4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(30, 125)) +
+  labs(x = "Year", y = "Mean pest abundance (clust 1)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 ## 5.2. Plants
 
 ### 5.2.1. Poaceae
 
 ```{r}
+plants_year1 <- plants_year |> 
+  filter(clust==1)
+
+plants_year2 <- plants_year |> 
+  filter(clust==2)
+
 mod <- glmmTMB(Poaceae ~ year * clust +  (1| id_parcelle) , data=plants_year,family=nbinom1)
 
 sim_res <- simulateResiduals(mod, n = 1000)
@@ -841,6 +964,22 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
         axis.title=element_text(size=16))+ 
   theme_graphique
 ```
+
+```{r}
+ggplot(plants_year2, aes(year, Poaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(15, 35)) +
+  labs(x = "Year", y = "Mean Poaceae abundance (cluster 2)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 
 ### 5.2.2. Asteraceae
 
@@ -942,6 +1081,21 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
   theme_graphique
 ```
 
+```{r}
+ggplot(plants_year1, aes(year, Plantaginaceae)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(2, 8)) +
+  labs(x = "Year", y = "Mean Plantaginaceae abundance (cluster 1)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 ### 5.2.5. Convolvulaceae
 
 ```{r}
@@ -1031,6 +1185,8 @@ ggplot(plants_year2, aes(x = factor(year), y = Convolvulaceae)) +
     legend.position = "none"
   )
 ```
+
+
 
 ### 5.2.6. Rosaceae
 
@@ -1192,6 +1348,21 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
   theme_graphique
 ```
 
+```{r}
+ggplot(plants_year2, aes(year, richness)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(10, 25)) +
+  labs(x = "Year", y = "Mean plant richness (cluster 2)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
+```
+
 ### 5.2.12. Abundance
 
 ```{r}
@@ -1236,4 +1407,19 @@ ggplot(pred, aes(x = x, y = predicted, colour = group)) +
     theme(axis.text=element_text(size=16),
         axis.title=element_text(size=16))+ 
   theme_graphique
+```
+
+```{r}
+ggplot(plants_year2, aes(year, abundance)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "ribbon", aes(group = 1),
+               alpha = 0.3, fill = "darkolivegreen4") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1),
+               colour = "darkolivegreen4", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", colour = "darkolivegreen4", size = 2.5) +
+  scale_x_continuous(breaks = 2013:2024) +
+  coord_cartesian(ylim = c(50, 100)) +
+  labs(x = "Year", y = "Mean plant abundance (cluster 2)") +
+  theme_minimal() + 
+theme(axis.title = element_text(size = 18),
+      axis.text  = element_text(size = 15))
 ```
